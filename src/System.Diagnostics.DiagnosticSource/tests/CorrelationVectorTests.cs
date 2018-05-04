@@ -61,6 +61,43 @@ namespace System.Diagnostics.Tests
         }
 
         [Fact]
+        public void ExtendWithSpanId()
+        {
+            string spanId = "abcd12345";
+            var originalCorrelationVector = new CorrelationVector();
+
+            Assert.EndsWith(".0", originalCorrelationVector.Value);
+
+            CorrelationVector extendedVector = CorrelationVector.Extend(originalCorrelationVector.Value, spanId);
+
+            Assert.EndsWith(".0-" + spanId + ".0", extendedVector.Value);
+        }
+
+        [Fact]
+        public void ExtendWithSpanIdTriggersReset()
+        {
+            var originalCorrelationVector = new CorrelationVector();
+
+            var correlationVector = CorrelationVector.Extend(originalCorrelationVector.Value);
+
+            while (correlationVector.Value.Length < 120)
+            {
+                // Keep extending until we get reasonably close to max length
+                correlationVector = CorrelationVector.Extend(correlationVector.Value);
+            }
+
+            string spanId = new string('*', 127 - correlationVector.Value.Length - 2);
+
+            correlationVector = CorrelationVector.Extend(correlationVector.Value, spanId);
+
+            Assert.StartsWith("#", correlationVector.Value);
+            Assert.EndsWith("-" + spanId + ".0", correlationVector.Value);
+            Assert.DoesNotContain(
+                originalCorrelationVector.Value.Substring(0, originalCorrelationVector.Value.IndexOf('.')),
+                correlationVector.Value);
+        }
+
+        [Fact]
         public void ExtendTriggersReset()
         {
             var originalCorrelationVector = new CorrelationVector();
@@ -69,6 +106,7 @@ namespace System.Diagnostics.Tests
 
             while (correlationVector.Value.Length > 25)
             {
+                // Keep extending until a reset happens (length is reduced to less than 25)
                 correlationVector = CorrelationVector.Extend(correlationVector.Value);
             }
 
