@@ -14,6 +14,7 @@ namespace System.Diagnostics
     {
         private const byte BaseLength = 22;
         private const byte MaxVectorLength = 127;
+        private const byte SpinLength = 4;
 
         private string baseVector = null;
         private int extension = 0;
@@ -24,7 +25,7 @@ namespace System.Diagnostics
         /// </summary>
         public CorrelationVector()
         {
-            this.baseVector = CorrelationVector.GetBaseFromGuid( Guid.NewGuid() );
+            this.baseVector = CorrelationVector.GetBaseFromGuid(Guid.NewGuid());
         }
 
         /// <summary>
@@ -34,7 +35,7 @@ namespace System.Diagnostics
         {
             get
             {
-                return string.Concat( this.baseVector, ".", this.extension );
+                return string.Concat(this.baseVector, ".", this.extension);
             }
         }
 
@@ -52,29 +53,95 @@ namespace System.Diagnostics
             do
             {
                 snapshot = this.extension;
-                if ( snapshot == int.MaxValue )
+                if (snapshot == int.MaxValue)
                 {
                     return this.Value;
                 }
                 next = snapshot + 1;
-                int size = baseVector.Length + 1 + (int)Math.Log10( next ) + 1;
-                if ( size > CorrelationVector.MaxVectorLength )
+                int size = baseVector.Length + 1 + (int)Math.Log10(next) + 1;
+                if (size > CorrelationVector.MaxVectorLength)
                 {
                     // Perform a reset
-                    lock ( resetLock )
+                    lock (resetLock)
                     {
                         // Check size again in case another thread did the reset
-                        size = baseVector.Length + 1 + (int)Math.Log10( next ) + 1;
-                        if ( size > CorrelationVector.MaxVectorLength )
+                        size = baseVector.Length + 1 + (int)Math.Log10(next) + 1;
+                        if (size > CorrelationVector.MaxVectorLength)
                         {
-                            this.baseVector = string.Concat( "#", CorrelationVector.GetBaseFromGuid( Guid.NewGuid() ) );
+                            this.baseVector = string.Concat("#", CorrelationVector.GetBaseFromGuid(Guid.NewGuid()));
                         }
                     }
                 }
             }
-            while ( snapshot != Interlocked.CompareExchange( ref this.extension, next, snapshot ) );
+            while (snapshot != Interlocked.CompareExchange(ref this.extension, next, snapshot));
 
-            return string.Concat( this.baseVector, ".", next );
+            return string.Concat(this.baseVector, ".", next);
+        }
+
+        /// <summary>
+        /// TBD - describe this thing
+        /// </summary>
+        /// <param name="correlationVector">
+        /// Taken from the message header.
+        /// </param>
+        /// <returns>TBD - describe this thing.</returns>
+        public static CorrelationVector Spin(string correlationVector)
+        {
+            var random = new Random(DateTime.Now.Millisecond);
+            int spinElement = random.Next( (10^(SpinLength - 1)), (10 ^ (SpinLength)) - 1);
+
+            // 3 accounts for the "_" before the spinElement and the ".0"  at the end of the new Correlation Vector
+            int size = correlationVector.Length + (int)Math.Log10(spinElement) + 3;
+
+            if (size > CorrelationVector.MaxVectorLength)
+            {
+                return new CorrelationVector()
+                {
+                    baseVector = string.Concat("#", CorrelationVector.GetBaseFromGuid(Guid.NewGuid())),
+                    extension = 0
+                };
+            }
+
+            return new CorrelationVector()
+            {
+                baseVector = string.Concat(correlationVector, "_", spinElement),
+                extension = 0
+            };
+        }
+
+        /// <summary>
+        /// TBD - describe this thing
+        /// </summary>
+        /// <param name="correlationVector">
+        /// Taken from the message header.
+        /// </param>
+        /// <param name="spanId">
+        /// TBD - describe this thing.
+        /// </param>
+        /// <returns>TBD - describe this thing.</returns>
+        public static CorrelationVector Spin(string correlationVector, string spanId)
+        {
+            var random = new Random(DateTime.Now.Millisecond);
+            int spinElement = random.Next((10 ^ (SpinLength - 1)), (10 ^ (SpinLength)) - 1);
+
+            // 3 accounts for the "-" before the spanId, the "_" before the spinElement
+            // and the ".0"  at the end of the new Correlation Vector
+            int size = correlationVector.Length + spanId.Length + (int)Math.Log10(spinElement) + 4;
+
+            if (size > CorrelationVector.MaxVectorLength)
+            {
+                return new CorrelationVector()
+                {
+                    baseVector = string.Concat("#", CorrelationVector.GetBaseFromGuid(Guid.NewGuid()), "-", spanId),
+                    extension = 0
+                };
+            }
+
+            return new CorrelationVector()
+            {
+                baseVector = string.Concat(correlationVector, "-", spanId, "_", spinElement),
+                extension = 0
+            };
         }
 
         /// <summary>
@@ -85,16 +152,16 @@ namespace System.Diagnostics
         /// Taken from the message header.
         /// </param>
         /// <returns>A new correlation vector extended from the current vector.</returns>
-        public static CorrelationVector Extend( string correlationVector )
+        public static CorrelationVector Extend(string correlationVector)
         {
             // 2 accounts for the ".0" at the end of the new CorrelationVector
             int size = correlationVector.Length + 2;
 
-            if ( size > CorrelationVector.MaxVectorLength )
+            if (size > CorrelationVector.MaxVectorLength)
             {
                 return new CorrelationVector()
                 {
-                    baseVector = string.Concat( "#", CorrelationVector.GetBaseFromGuid( Guid.NewGuid() ) ),
+                    baseVector = string.Concat("#", CorrelationVector.GetBaseFromGuid(Guid.NewGuid())),
                     extension = 0
                 };
             }
@@ -117,38 +184,38 @@ namespace System.Diagnostics
         /// ID of the Span.
         /// </param>
         /// <returns>A new correlation vector extended from the current vector.</returns>
-        public static CorrelationVector Extend( string correlationVector, string spanId )
+        public static CorrelationVector Extend(string correlationVector, string spanId)
         {
             // 3 accounts for the dash '-' before spanId and ".0" at the end of the
             // new CorrelationVector
             int size = correlationVector.Length + spanId.Length + 3;
 
-            if ( size > CorrelationVector.MaxVectorLength )
+            if (size > CorrelationVector.MaxVectorLength)
             {
                 return new CorrelationVector()
                 {
                     baseVector = string.Concat(
                         "#",
-                        CorrelationVector.GetBaseFromGuid( Guid.NewGuid() ),
+                        CorrelationVector.GetBaseFromGuid(Guid.NewGuid()),
                         "-",
-                        spanId ),
+                        spanId),
                     extension = 0
                 };
             }
 
             return new CorrelationVector()
             {
-                baseVector = string.Concat( correlationVector, "-", spanId ),
+                baseVector = string.Concat(correlationVector, "-", spanId),
                 extension = 0
             };
         }
 
-        private static string GetBaseFromGuid( Guid guid )
+        private static string GetBaseFromGuid(Guid guid)
         {
             byte[] bytes = guid.ToByteArray();
 
             // Removes the base64 padding
-            return Convert.ToBase64String( bytes ).Substring( 0, CorrelationVector.BaseLength );
+            return Convert.ToBase64String(bytes).Substring(0, CorrelationVector.BaseLength);
         }
     }
 }

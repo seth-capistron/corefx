@@ -12,7 +12,9 @@ namespace System.Diagnostics
         public CorrelationVector() { }
         public string Value { get { throw null; } }
         public string Increment() { throw null; }
-        public static CorrelationVector Extend( string correlationVector ) { throw null; }
-        public static CorrelationVector Extend( string correlationVector, string spanId ) { throw null; }
+        public static CorrelationVector Extend(string correlationVector) { throw null; }
+        public static CorrelationVector Extend(string correlationVector, string spanId) { throw null; }
+        public static CorrelationVector Spin(string correlationVector) { throw null; }
+        public static CorrelationVector Spin(string correlationVector, string spanId) { throw null; }
     }
 }
