@@ -9,6 +9,13 @@ namespace System.Diagnostics.Tests
 {
     public class CorrelationVectorTests
     {
+        private const int BaseLength = 22;
+        private const int MaxVectorLength = 127;
+
+        private const string ResetChar = "#";
+        private const string SpanChar = "-";
+        private const string SpinChar = "_";
+
         [Fact]
         public void BasicCorrelationVector()
         {
@@ -22,13 +29,75 @@ namespace System.Diagnostics.Tests
         }
 
         [Fact]
+        public void ExtendTriggersReset()
+        {
+            var originalCorrelationVector = new CorrelationVector();
+
+            var correlationVector = CorrelationVector.Extend(originalCorrelationVector.Value);
+
+            while (correlationVector.Value.Length > (BaseLength + 3))
+            {
+                // Keep extending until a reset happens (length is reduced to less than 25)
+                correlationVector = CorrelationVector.Extend(correlationVector.Value);
+            }
+
+            Assert.StartsWith(ResetChar, correlationVector.Value);
+            Assert.EndsWith(".0", correlationVector.Value);
+            Assert.DoesNotContain(
+                originalCorrelationVector.Value.Substring(0, originalCorrelationVector.Value.IndexOf('.')),
+                correlationVector.Value);
+            Assert.Equal(
+                BaseLength,
+                correlationVector.Value.Substring(0, correlationVector.Value.IndexOf('.')).Length);
+        }
+
+        [Fact]
+        public void ExtendWithSpanId()
+        {
+            string spanId = "abcd12345";
+            var originalCorrelationVector = new CorrelationVector();
+
+            Assert.EndsWith(".0", originalCorrelationVector.Value);
+
+            CorrelationVector extendedVector = CorrelationVector.Extend(originalCorrelationVector.Value, spanId);
+
+            Assert.EndsWith(
+                string.Concat(".0", SpanChar, spanId, ".0"),
+                extendedVector.Value);
+        }
+
+        [Fact]
+        public void ExtendWithSpanIdTriggersReset()
+        {
+            var originalCorrelationVector = new CorrelationVector();
+
+            var correlationVector = CorrelationVector.Extend(originalCorrelationVector.Value);
+
+            while (correlationVector.Value.Length < (MaxVectorLength - 7))
+            {
+                // Keep extending until we get reasonably close to max length
+                correlationVector = CorrelationVector.Extend(correlationVector.Value);
+            }
+
+            string spanId = new string('*', MaxVectorLength - correlationVector.Value.Length - 2);
+
+            correlationVector = CorrelationVector.Extend(correlationVector.Value, spanId);
+
+            Assert.StartsWith(ResetChar, correlationVector.Value);
+            Assert.EndsWith(string.Concat(SpanChar, spanId, ".0"), correlationVector.Value);
+            Assert.DoesNotContain(
+                originalCorrelationVector.Value.Substring(0, originalCorrelationVector.Value.IndexOf('.')),
+                correlationVector.Value);
+        }
+
+        [Fact]
         public void IncrementTriggersReset()
         {
             var correlationVector = new CorrelationVector();
 
             string correlationVectorString = correlationVector.Value;
 
-            while (correlationVectorString.Length < 124)
+            while (correlationVectorString.Length < (MaxVectorLength - 3))
             {
                 correlationVectorString += ".1";
             }
@@ -44,15 +113,15 @@ namespace System.Diagnostics.Tests
                 incrementCounter++;
 
                 Assert.Equal(incrementedValue, aboutToOverflow.Value);
-                Assert.False(aboutToOverflow.Value.Length > 127);
             }
 
-            Assert.StartsWith("#", aboutToOverflow.Value);
+            Assert.StartsWith(ResetChar, aboutToOverflow.Value);
             Assert.EndsWith(string.Concat(".", incrementCounter), aboutToOverflow.Value);
             Assert.Equal(1, aboutToOverflow.Value.Count(c => c == '.'));
             Assert.DoesNotContain(
                 correlationVector.Value.Substring(0, correlationVector.Value.IndexOf('.')),
                 aboutToOverflow.Value);
+            Assert.Equal(BaseLength, aboutToOverflow.Value.Substring(0, aboutToOverflow.Value.IndexOf('.')).Length);
 
             aboutToOverflow.Increment();
             incrementCounter++;
@@ -61,60 +130,52 @@ namespace System.Diagnostics.Tests
         }
 
         [Fact]
-        public void ExtendWithSpanId()
+        public void SpinWithSpanId()
         {
             string spanId = "abcd12345";
+
             var originalCorrelationVector = new CorrelationVector();
 
-            Assert.EndsWith(".0", originalCorrelationVector.Value);
+            var correlationVector = CorrelationVector.Spin(originalCorrelationVector.Value, spanId);
 
-            CorrelationVector extendedVector = CorrelationVector.Extend(originalCorrelationVector.Value, spanId);
-
-            Assert.EndsWith(".0-" + spanId + ".0", extendedVector.Value);
-        }
-
-        [Fact]
-        public void ExtendWithSpanIdTriggersReset()
-        {
-            var originalCorrelationVector = new CorrelationVector();
-
-            var correlationVector = CorrelationVector.Extend(originalCorrelationVector.Value);
-
-            while (correlationVector.Value.Length < 120)
-            {
-                // Keep extending until we get reasonably close to max length
-                correlationVector = CorrelationVector.Extend(correlationVector.Value);
-            }
-
-            string spanId = new string('*', 127 - correlationVector.Value.Length - 2);
-
-            correlationVector = CorrelationVector.Extend(correlationVector.Value, spanId);
-
-            Assert.StartsWith("#", correlationVector.Value);
-            Assert.EndsWith("-" + spanId + ".0", correlationVector.Value);
-            Assert.DoesNotContain(
-                originalCorrelationVector.Value.Substring(0, originalCorrelationVector.Value.IndexOf('.')),
+            Assert.StartsWith(
+                string.Concat(originalCorrelationVector.Value, SpanChar, spanId, SpinChar),
                 correlationVector.Value);
-        }
 
-        [Fact]
-        public void ExtendTriggersReset()
-        {
-            var originalCorrelationVector = new CorrelationVector();
-
-            var correlationVector = CorrelationVector.Extend(originalCorrelationVector.Value);
-
-            while (correlationVector.Value.Length > 25)
-            {
-                // Keep extending until a reset happens (length is reduced to less than 25)
-                correlationVector = CorrelationVector.Extend(correlationVector.Value);
-            }
-
-            Assert.StartsWith("#", correlationVector.Value);
             Assert.EndsWith(".0", correlationVector.Value);
+        }
+
+        [Fact]
+        public void SpinWithSpanIdTriggersReset()
+        {
+            string interimSpanId = "abc123";
+            var originalCorrelationVector = new CorrelationVector();
+
+            var correlationVector = CorrelationVector.Extend(originalCorrelationVector.Value);
+
+            // Keep spinning until we get reasonably close to max length
+            while (correlationVector.Value.Length < (MaxVectorLength - 20))
+            {
+                string correlationVectorBeforeSpin = correlationVector.Value;
+
+                correlationVector = CorrelationVector.Spin(correlationVector.Value, interimSpanId);
+
+                Assert.StartsWith(
+                    string.Concat(correlationVectorBeforeSpin, SpanChar, interimSpanId, SpinChar),
+                    correlationVector.Value);
+                Assert.EndsWith(".0", correlationVector.Value);
+            }
+
+            // Perform a Spin using a SpanId that will cause a reset
+            string spanId = new string('*', MaxVectorLength - correlationVector.Value.Length - 6);
+
+            var resetCorrelationVector = CorrelationVector.Spin(correlationVector.Value, spanId);
+
+            Assert.StartsWith(ResetChar, resetCorrelationVector.Value);
+            Assert.EndsWith(SpanChar + spanId + ".0", resetCorrelationVector.Value);
             Assert.DoesNotContain(
                 originalCorrelationVector.Value.Substring(0, originalCorrelationVector.Value.IndexOf('.')),
-                correlationVector.Value);
+                resetCorrelationVector.Value);
         }
     }
 }

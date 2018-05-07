@@ -16,8 +16,13 @@ namespace System.Diagnostics
         private const byte MaxVectorLength = 127;
         private const byte SpinLength = 4;
 
+        private const char ResetChar = '#';
+        private const char SpanChar = '-';
+        private const char SpinChar = '_';
+
         private string baseVector = null;
-        private int extension = 0;
+        private uint extension = 0;
+        object incrementLock = new object();
         private object resetLock = new object();
 
         /// <summary>
@@ -25,7 +30,7 @@ namespace System.Diagnostics
         /// </summary>
         public CorrelationVector()
         {
-            this.baseVector = CorrelationVector.GetBaseFromGuid(Guid.NewGuid());
+            this.baseVector = CorrelationVector.GetBaseFromGuid(isReset: false);
         }
 
         /// <summary>
@@ -48,15 +53,11 @@ namespace System.Diagnostics
         /// </returns>
         public string Increment()
         {
-            int snapshot = 0;
-            int next = 0;
+            uint snapshot = 0;
+            uint next = 0;
             do
             {
                 snapshot = this.extension;
-                if (snapshot == int.MaxValue)
-                {
-                    return this.Value;
-                }
                 next = snapshot + 1;
                 int size = baseVector.Length + 1 + (int)Math.Log10(next) + 1;
                 if (size > CorrelationVector.MaxVectorLength)
@@ -68,80 +69,14 @@ namespace System.Diagnostics
                         size = baseVector.Length + 1 + (int)Math.Log10(next) + 1;
                         if (size > CorrelationVector.MaxVectorLength)
                         {
-                            this.baseVector = string.Concat("#", CorrelationVector.GetBaseFromGuid(Guid.NewGuid()));
+                            this.baseVector = CorrelationVector.GetBaseFromGuid(isReset: true);
                         }
                     }
                 }
             }
-            while (snapshot != Interlocked.CompareExchange(ref this.extension, next, snapshot));
+            while (!AttemptCommitIncrement(next, snapshot));
 
             return string.Concat(this.baseVector, ".", next);
-        }
-
-        /// <summary>
-        /// TBD - describe this thing
-        /// </summary>
-        /// <param name="correlationVector">
-        /// Taken from the message header.
-        /// </param>
-        /// <returns>TBD - describe this thing.</returns>
-        public static CorrelationVector Spin(string correlationVector)
-        {
-            var random = new Random(DateTime.Now.Millisecond);
-            int spinElement = random.Next( (10^(SpinLength - 1)), (10 ^ (SpinLength)) - 1);
-
-            // 3 accounts for the "_" before the spinElement and the ".0"  at the end of the new Correlation Vector
-            int size = correlationVector.Length + (int)Math.Log10(spinElement) + 3;
-
-            if (size > CorrelationVector.MaxVectorLength)
-            {
-                return new CorrelationVector()
-                {
-                    baseVector = string.Concat("#", CorrelationVector.GetBaseFromGuid(Guid.NewGuid())),
-                    extension = 0
-                };
-            }
-
-            return new CorrelationVector()
-            {
-                baseVector = string.Concat(correlationVector, "_", spinElement),
-                extension = 0
-            };
-        }
-
-        /// <summary>
-        /// TBD - describe this thing
-        /// </summary>
-        /// <param name="correlationVector">
-        /// Taken from the message header.
-        /// </param>
-        /// <param name="spanId">
-        /// TBD - describe this thing.
-        /// </param>
-        /// <returns>TBD - describe this thing.</returns>
-        public static CorrelationVector Spin(string correlationVector, string spanId)
-        {
-            var random = new Random(DateTime.Now.Millisecond);
-            int spinElement = random.Next((10 ^ (SpinLength - 1)), (10 ^ (SpinLength)) - 1);
-
-            // 3 accounts for the "-" before the spanId, the "_" before the spinElement
-            // and the ".0"  at the end of the new Correlation Vector
-            int size = correlationVector.Length + spanId.Length + (int)Math.Log10(spinElement) + 4;
-
-            if (size > CorrelationVector.MaxVectorLength)
-            {
-                return new CorrelationVector()
-                {
-                    baseVector = string.Concat("#", CorrelationVector.GetBaseFromGuid(Guid.NewGuid()), "-", spanId),
-                    extension = 0
-                };
-            }
-
-            return new CorrelationVector()
-            {
-                baseVector = string.Concat(correlationVector, "-", spanId, "_", spinElement),
-                extension = 0
-            };
         }
 
         /// <summary>
@@ -161,7 +96,7 @@ namespace System.Diagnostics
             {
                 return new CorrelationVector()
                 {
-                    baseVector = string.Concat("#", CorrelationVector.GetBaseFromGuid(Guid.NewGuid())),
+                    baseVector = CorrelationVector.GetBaseFromGuid(isReset: true),
                     extension = 0
                 };
             }
@@ -195,9 +130,8 @@ namespace System.Diagnostics
                 return new CorrelationVector()
                 {
                     baseVector = string.Concat(
-                        "#",
-                        CorrelationVector.GetBaseFromGuid(Guid.NewGuid()),
-                        "-",
+                        CorrelationVector.GetBaseFromGuid(isReset: true),
+                        SpanChar,
                         spanId),
                     extension = 0
                 };
@@ -205,17 +139,106 @@ namespace System.Diagnostics
 
             return new CorrelationVector()
             {
-                baseVector = string.Concat(correlationVector, "-", spanId),
+                baseVector = string.Concat(correlationVector, SpanChar, spanId),
                 extension = 0
             };
         }
 
-        private static string GetBaseFromGuid(Guid guid)
+        /// <summary>
+        /// TBD - describe this thing
+        /// </summary>
+        /// <param name="correlationVector">
+        /// Taken from the message header.
+        /// </param>
+        /// <returns>TBD - describe this thing.</returns>
+        public static CorrelationVector Spin(string correlationVector)
         {
-            byte[] bytes = guid.ToByteArray();
+            var random = new Random(DateTime.Now.Millisecond);
+            int spinElement = random.Next(
+                (int)Math.Pow(10, (SpinLength - 1)),
+                (int)Math.Pow(10, (SpinLength)) - 1);
 
-            // Removes the base64 padding
-            return Convert.ToBase64String(bytes).Substring(0, CorrelationVector.BaseLength);
+            // 3 accounts for the "_" before the spinElement and the ".0"  at the end of the new Correlation Vector
+            int size = correlationVector.Length + (int)Math.Log10(spinElement) + 3;
+
+            if (size > CorrelationVector.MaxVectorLength)
+            {
+                return new CorrelationVector()
+                {
+                    baseVector = CorrelationVector.GetBaseFromGuid(isReset: true),
+                    extension = 0
+                };
+            }
+
+            return new CorrelationVector()
+            {
+                baseVector = string.Concat(correlationVector, SpinChar, spinElement),
+                extension = 0
+            };
+        }
+
+        /// <summary>
+        /// TBD - describe this thing
+        /// </summary>
+        /// <param name="correlationVector">
+        /// Taken from the message header.
+        /// </param>
+        /// <param name="spanId">
+        /// TBD - describe this thing.
+        /// </param>
+        /// <returns>TBD - describe this thing.</returns>
+        public static CorrelationVector Spin(string correlationVector, string spanId)
+        {
+            var random = new Random(DateTime.Now.Millisecond);
+            int spinElement = random.Next(
+                (int)Math.Pow(10, (SpinLength - 1)),
+                (int)Math.Pow(10, (SpinLength)) - 1);
+
+            // 3 accounts for the "-" before the spanId, the "_" before the spinElement
+            // and the ".0"  at the end of the new Correlation Vector
+            int size = correlationVector.Length + spanId.Length + (int)Math.Log10(spinElement) + 4;
+
+            if (size > CorrelationVector.MaxVectorLength)
+            {
+                return new CorrelationVector()
+                {
+                    baseVector = string.Concat(
+                        CorrelationVector.GetBaseFromGuid(isReset: true),
+                        SpanChar,
+                        spanId),
+                    extension = 0
+                };
+            }
+
+            return new CorrelationVector()
+            {
+                baseVector = string.Concat(correlationVector, SpanChar, spanId, SpinChar, spinElement),
+                extension = 0
+            };
+        }
+
+        private bool AttemptCommitIncrement(uint next, uint snapshot)
+        {
+            lock (incrementLock)
+            {
+                if (this.extension != snapshot)
+                {
+                    return false;
+                }
+
+                this.extension = next;
+                return true;
+            }
+        }
+
+        private static string GetBaseFromGuid(bool isReset)
+        {
+            string generatedCharacters = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+            
+            // If isReset, then prepend '#'. Length will always be 22 total (including '#', if present).
+            return string.Concat(
+                isReset ? ResetChar.ToString() : string.Empty,
+                generatedCharacters.Substring(0, CorrelationVector.BaseLength - (isReset ? 1 : 0)));
         }
     }
 }
