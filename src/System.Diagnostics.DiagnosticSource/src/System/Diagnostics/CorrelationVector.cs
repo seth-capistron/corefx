@@ -19,16 +19,16 @@ namespace System.Diagnostics
         private const char ResetChar = '#';
         private const char SpinChar = '_';
 
-        private string baseVector = null;
-        private int extension = 0;
-        private object resetLock = new object();
+        private string _baseVector = null;
+        private int _extension = 0;
+        private object _resetLock = new object();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CorrelationVector"/> class.
         /// </summary>
         public CorrelationVector()
         {
-            this.baseVector = CorrelationVector.GetBase(isReset: false);
+            _baseVector = CorrelationVector.GetBase(isReset: false);
         }
 
         /// <summary>
@@ -44,7 +44,7 @@ namespace System.Diagnostics
         {
             get
             {
-                return string.Concat(this.baseVector, ElementChar, this.extension);
+                return string.Concat(_baseVector, ElementChar, _extension);
             }
         }
 
@@ -61,33 +61,33 @@ namespace System.Diagnostics
             int next = 0;
             do
             {
-                snapshot = this.extension;
+                snapshot = _extension;
                 if (snapshot == int.MaxValue)
                 {
                     // Don't proceed past int.MaxValue, since we don't have a performant way of reliably
                     // incrementing and rolling-over (Interlocked.CompareExchange doesn't have a uint implementation)
-                    return this.Value;
+                    return Value;
                 }
                 next = snapshot + 1;
-                int size = baseVector.Length + 1 + (int)Math.Log10(next) + 1;
+                int size = _baseVector.Length + 1 + (int)Math.Log10(next) + 1;
                 if (size > CorrelationVector.MaxVectorLength)
                 {
                     // Perform a reset
-                    lock (resetLock)
+                    lock (_resetLock)
                     {
                         // Check size again in case another thread did the reset
-                        size = baseVector.Length + 1 + (int)Math.Log10(next) + 1;
+                        size = _baseVector.Length + 1 + (int)Math.Log10(next) + 1;
                         if (size > CorrelationVector.MaxVectorLength)
                         {
-                            this.PreviousBase = GetBaseFromVector(this.baseVector);
-                            this.baseVector = CorrelationVector.GetBase(isReset: true);
+                            PreviousBase = GetBaseFromVector(_baseVector);
+                            _baseVector = CorrelationVector.GetBase(isReset: true);
                         }
                     }
                 }
             }
-            while (snapshot != Interlocked.CompareExchange(ref this.extension, next, snapshot));
+            while (snapshot != Interlocked.CompareExchange(ref _extension, next, snapshot));
 
-            return string.Concat(this.baseVector, ElementChar, next);
+            return string.Concat(_baseVector, ElementChar, next);
         }
 
         /// <summary>
@@ -103,7 +103,7 @@ namespace System.Diagnostics
         /// </returns>
         public bool Equals(CorrelationVector correlationVector)
         {
-            return string.Equals(this.Value, correlationVector.Value, StringComparison.Ordinal);
+            return string.Equals(Value, correlationVector.Value, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -123,16 +123,16 @@ namespace System.Diagnostics
             {
                 return new CorrelationVector()
                 {
-                    baseVector = CorrelationVector.GetBase(isReset: true),
-                    extension = 0,
+                    _baseVector = CorrelationVector.GetBase(isReset: true),
+                    _extension = 0,
                     PreviousBase = GetBaseFromVector(correlationVector)
                 };
             }
 
             return new CorrelationVector()
             {
-                baseVector = correlationVector,
-                extension = 0
+                _baseVector = correlationVector,
+                _extension = 0
             };
         }
 
@@ -155,16 +155,16 @@ namespace System.Diagnostics
             {
                 return new CorrelationVector()
                 {
-                    baseVector = CorrelationVector.GetBase(isReset: true),
-                    extension = 0,
+                    _baseVector = CorrelationVector.GetBase(isReset: true),
+                    _extension = 0,
                     PreviousBase = GetBaseFromVector(correlationVector)
                 };
             }
 
             return new CorrelationVector()
             {
-                baseVector = string.Concat(correlationVector, SpinChar, spinElement),
-                extension = 0
+                _baseVector = string.Concat(correlationVector, SpinChar, spinElement),
+                _extension = 0
             };
         }
 
@@ -174,7 +174,7 @@ namespace System.Diagnostics
         /// <returns>A string that represents the current object.</returns>
         public override string ToString()
         {
-            return this.Value;
+            return Value;
         }
 
         private static string GetBase(bool isReset)
