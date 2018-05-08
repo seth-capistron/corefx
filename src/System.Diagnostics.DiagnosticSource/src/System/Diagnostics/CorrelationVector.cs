@@ -14,9 +14,10 @@ namespace System.Diagnostics
     {
         private const byte BaseLength = 22;
         private const byte MaxVectorLength = 127;
-        private const byte SpinLength = 4;
 
+        private const char ElementChar = '.';
         private const char ResetChar = '#';
+        private const char SpinChar = '_';
 
         private string baseVector = null;
         private int extension = 0;
@@ -27,8 +28,13 @@ namespace System.Diagnostics
         /// </summary>
         public CorrelationVector()
         {
-            this.baseVector = CorrelationVector.GetBaseFromGuid(isReset: false);
+            this.baseVector = CorrelationVector.GetBase(isReset: false);
         }
+
+        /// <summary>
+        /// Gets the value of the Vector Base prior to a reset being performed.
+        /// </summary>
+        public string PreviousBase { get; private set; } = null;
 
         /// <summary>
         /// Gets the value of the correlation vector as a string.
@@ -37,14 +43,9 @@ namespace System.Diagnostics
         {
             get
             {
-                return string.Concat(this.baseVector, ".", this.extension);
+                return string.Concat(this.baseVector, ElementChar, this.extension);
             }
         }
-
-        /// <summary>
-        /// Gets the value of the Vector Base prior to a reset being performed.
-        /// </summary>
-        public string PreviousBase { get; private set; } = null;
 
         /// <summary>
         /// Increments the current extension by one. Do this before passing the value to an
@@ -60,6 +61,12 @@ namespace System.Diagnostics
             do
             {
                 snapshot = this.extension;
+                if (snapshot == int.MaxValue)
+                {
+                    // Don't proceed past int.MaxValue, since we don't have a performant way of reliably
+                    // incrementing and rolling-over (Interlocked.CompareExchange doesn't have a uint implementation)
+                    return this.Value;
+                }
                 next = snapshot + 1;
                 int size = baseVector.Length + 1 + (int)Math.Log10(next) + 1;
                 if (size > CorrelationVector.MaxVectorLength)
@@ -72,14 +79,30 @@ namespace System.Diagnostics
                         if (size > CorrelationVector.MaxVectorLength)
                         {
                             this.PreviousBase = GetBaseFromVector(this.baseVector);
-                            this.baseVector = CorrelationVector.GetBaseFromGuid(isReset: true);
+                            this.baseVector = CorrelationVector.GetBase(isReset: true);
                         }
                     }
                 }
             }
             while (snapshot != Interlocked.CompareExchange(ref this.extension, next, snapshot));
 
-            return string.Concat(this.baseVector, ".", next);
+            return string.Concat(this.baseVector, ElementChar, next);
+        }
+
+        /// <summary>
+        /// Determines whether two instances of the <see cref="CorrelationVector"/> class
+        /// are equal. 
+        /// </summary>
+        /// <param name="correlationVector">
+        /// The correlation vector you want to compare with the current correlation vector.
+        /// </param>
+        /// <returns>
+        /// True if the specified correlation vector is equal to the current correlation
+        /// vector; otherwise, false.
+        /// </returns>
+        public bool Equals(CorrelationVector correlationVector)
+        {
+            return string.Equals(this.Value, correlationVector.Value, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -93,13 +116,13 @@ namespace System.Diagnostics
         public static CorrelationVector Extend(string correlationVector)
         {
             // 2 accounts for the ".0" at the end of the new CorrelationVector
-            int size = correlationVector.Length + 2;
+            int size = ((correlationVector == null) ? 0 : correlationVector.Length) + 2;
 
             if (size > CorrelationVector.MaxVectorLength)
             {
                 return new CorrelationVector()
                 {
-                    baseVector = CorrelationVector.GetBaseFromGuid(isReset: true),
+                    baseVector = CorrelationVector.GetBase(isReset: true),
                     extension = 0,
                     PreviousBase = GetBaseFromVector(correlationVector)
                 };
@@ -112,10 +135,51 @@ namespace System.Diagnostics
             };
         }
 
-        private static string GetBaseFromGuid(bool isReset)
+        /// <summary>
+        /// TBD - describe this thing
+        /// </summary>
+        /// <param name="correlationVector">
+        /// Taken from the message header.
+        /// </param>
+        /// <returns>A new correlation vector extended from the current vector.</returns>
+        public static CorrelationVector Spin(string correlationVector)
+        {
+            ulong spinElement = GetRandomUnsignedLong();
+            
+            // 3 accounts for the "_" before the spin element and the
+            // ".0" at the end of the new CorrelationVector
+            int size = correlationVector.Length + 3 + (int)Math.Log10(spinElement) + 1;
+
+            if (size > CorrelationVector.MaxVectorLength)
+            {
+                return new CorrelationVector()
+                {
+                    baseVector = CorrelationVector.GetBase(isReset: true),
+                    extension = 0,
+                    PreviousBase = GetBaseFromVector(correlationVector)
+                };
+            }
+
+            return new CorrelationVector()
+            {
+                baseVector = string.Concat(correlationVector, SpinChar, spinElement),
+                extension = 0
+            };
+        }
+
+        /// <summary>
+        /// Returns a string that represents the current object.
+        /// </summary>
+        /// <returns>A string that represents the current object.</returns>
+        public override string ToString()
+        {
+            return this.Value;
+        }
+
+        private static string GetBase(bool isReset)
         {
             string generatedCharacters = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-            
+
             // If isReset, then prepend '#'. Length will always be 22 total (including '#', if present).
             return string.Concat(
                 isReset ? ResetChar.ToString() : string.Empty,
@@ -124,20 +188,19 @@ namespace System.Diagnostics
 
         private static string GetBaseFromVector(string correlationVector)
         {
-            return correlationVector.Substring(0, correlationVector.IndexOf('.'));
+            if (correlationVector == null || correlationVector.IndexOf(ElementChar) < 0)
+            {
+                return correlationVector;
+            }
+
+            return correlationVector.Substring(0, correlationVector.IndexOf(ElementChar));
         }
 
-        //private static void NotifyError(Exception exception)
-        //{
-        //    // Throw and catch the exception.  This lets it be seen by the debugger
-        //    // ETW, and other monitoring tools.   However we immediately swallow the
-        //    // exception.   We may wish in the future to allow users to hook this 
-        //    // in other useful ways but for now we simply swallow the exceptions.  
-        //    try
-        //    {
-        //        throw exception;
-        //    }
-        //    catch { }
-        //}
+        private static unsafe ulong GetRandomUnsignedLong()
+        {
+            // Use the first 8 bytes of the GUID as a random number.  
+            Guid g = Guid.NewGuid();
+            return *((ulong*)&g);
+        }
     }
 }
