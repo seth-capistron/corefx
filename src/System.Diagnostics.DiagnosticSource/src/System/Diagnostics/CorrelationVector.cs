@@ -32,12 +32,13 @@ namespace System.Diagnostics
         }
 
         /// <summary>
-        /// Gets the value of the Vector Base prior to a reset being performed.
+        /// Gets the previous value of the Vector Base prior to a reset having been performed.
+        /// Value will be null if reset has not yet been performed.
         /// </summary>
         public string PreviousBase { get; private set; } = null;
 
         /// <summary>
-        /// Gets the value of the correlation vector as a string.
+        /// Gets the value of the Correlation Vector as a string.
         /// </summary>
         public string Value
         {
