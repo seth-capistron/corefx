@@ -108,6 +108,11 @@ namespace System.Diagnostics
         }
 
         /// <summary>
+        /// TBD...
+        /// </summary>
+        public CorrelationVector CorrelationVector { get; private set; }
+
+        /// <summary>
         /// Tags are string-string key-value pairs that represent information that will
         /// be logged along with the Activity to the logging system.   This information
         /// however is NOT passed on to the children of this activity.
@@ -310,6 +315,7 @@ namespace System.Diagnostics
                 }
 
                 Id = GenerateId();
+                //CorrelationVector = CorrelationVector.FromActivityId(Id);
                 SetCurrent(this);
             }
             return this;

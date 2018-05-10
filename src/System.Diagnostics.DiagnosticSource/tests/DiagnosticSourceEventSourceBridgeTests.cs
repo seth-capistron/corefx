@@ -510,112 +510,112 @@ namespace System.Diagnostics.Tests
             }
         }
 
-        /// <summary>
-        /// Tests that keywords that define shortcuts work.    
-        /// </summary>
-        [Fact]
-        public void TestShortcutKeywords()
-        {
-            using (var eventSourceListener = new TestDiagnosticSourceEventListener())
-            // These are look-alikes for the real ones.  
-            using (var aspNetCoreSource = new DiagnosticListener("Microsoft.AspNetCore"))
-            using (var entityFrameworkCoreSource = new DiagnosticListener("Microsoft.EntityFrameworkCore"))
-            {
-                // These are from DiagnosticSourceEventListener.  
-                var Messages = (EventKeywords)0x1;
-                var Events = (EventKeywords)0x2;
-                var AspNetCoreHosting = (EventKeywords)0x1000;
-                var EntityFrameworkCoreCommands = (EventKeywords)0x2000;
+        ///// <summary>
+        ///// Tests that keywords that define shortcuts work.    
+        ///// </summary>
+        //[Fact]
+        //public void TestShortcutKeywords()
+        //{
+        //    using (var eventSourceListener = new TestDiagnosticSourceEventListener())
+        //    // These are look-alikes for the real ones.  
+        //    using (var aspNetCoreSource = new DiagnosticListener("Microsoft.AspNetCore"))
+        //    using (var entityFrameworkCoreSource = new DiagnosticListener("Microsoft.EntityFrameworkCore"))
+        //    {
+        //        // These are from DiagnosticSourceEventListener.  
+        //        var Messages = (EventKeywords)0x1;
+        //        var Events = (EventKeywords)0x2;
+        //        var AspNetCoreHosting = (EventKeywords)0x1000;
+        //        var EntityFrameworkCoreCommands = (EventKeywords)0x2000;
 
-                // Turn on listener using just the keywords 
-                eventSourceListener.Enable(null, Messages | Events | AspNetCoreHosting | EntityFrameworkCoreCommands);
+        //        // Turn on listener using just the keywords 
+        //        eventSourceListener.Enable(null, Messages | Events | AspNetCoreHosting | EntityFrameworkCoreCommands);
 
-                Assert.Equal(0, eventSourceListener.EventCount);
+        //        Assert.Equal(0, eventSourceListener.EventCount);
 
-                // Start a ASP.NET Request
-                aspNetCoreSource.Write("Microsoft.AspNetCore.Hosting.BeginRequest",
-                    new
-                    {
-                        httpContext = new
-                        {
-                            Request = new
-                            {
-                                Method = "Get",
-                                Host = "MyHost",
-                                Path = "MyPath",
-                                QueryString = "MyQuery"
-                            }
-                        }
-                    });
-                // Check that the morphs work as expected.  
-                Assert.Equal(1, eventSourceListener.EventCount); // Exactly one more event has been emitted.
-                Assert.Equal("Activity1Start", eventSourceListener.LastEvent.EventSourceEventName);
-                Assert.Equal("Microsoft.AspNetCore", eventSourceListener.LastEvent.SourceName);
-                Assert.Equal("Microsoft.AspNetCore.Hosting.BeginRequest", eventSourceListener.LastEvent.EventName);
-                Assert.True(4 <= eventSourceListener.LastEvent.Arguments.Count);
-                Debug.WriteLine("Arg Keys = " + string.Join(" ", eventSourceListener.LastEvent.Arguments.Keys));
-                Debug.WriteLine("Arg Values = " + string.Join(" ", eventSourceListener.LastEvent.Arguments.Values));
-                Assert.Equal("Get", eventSourceListener.LastEvent.Arguments["Method"]);
-                Assert.Equal("MyHost", eventSourceListener.LastEvent.Arguments["Host"]);
-                Assert.Equal("MyPath", eventSourceListener.LastEvent.Arguments["Path"]);
-                Assert.Equal("MyQuery", eventSourceListener.LastEvent.Arguments["QueryString"]);
-                eventSourceListener.ResetEventCountAndLastEvent();
+        //        // Start a ASP.NET Request
+        //        aspNetCoreSource.Write("Microsoft.AspNetCore.Hosting.BeginRequest",
+        //            new
+        //            {
+        //                httpContext = new
+        //                {
+        //                    Request = new
+        //                    {
+        //                        Method = "Get",
+        //                        Host = "MyHost",
+        //                        Path = "MyPath",
+        //                        QueryString = "MyQuery"
+        //                    }
+        //                }
+        //            });
+        //        // Check that the morphs work as expected.  
+        //        Assert.Equal(1, eventSourceListener.EventCount); // Exactly one more event has been emitted.
+        //        Assert.Equal("Activity1Start", eventSourceListener.LastEvent.EventSourceEventName);
+        //        Assert.Equal("Microsoft.AspNetCore", eventSourceListener.LastEvent.SourceName);
+        //        Assert.Equal("Microsoft.AspNetCore.Hosting.BeginRequest", eventSourceListener.LastEvent.EventName);
+        //        Assert.True(4 <= eventSourceListener.LastEvent.Arguments.Count);
+        //        Debug.WriteLine("Arg Keys = " + string.Join(" ", eventSourceListener.LastEvent.Arguments.Keys));
+        //        Debug.WriteLine("Arg Values = " + string.Join(" ", eventSourceListener.LastEvent.Arguments.Values));
+        //        Assert.Equal("Get", eventSourceListener.LastEvent.Arguments["Method"]);
+        //        Assert.Equal("MyHost", eventSourceListener.LastEvent.Arguments["Host"]);
+        //        Assert.Equal("MyPath", eventSourceListener.LastEvent.Arguments["Path"]);
+        //        Assert.Equal("MyQuery", eventSourceListener.LastEvent.Arguments["QueryString"]);
+        //        eventSourceListener.ResetEventCountAndLastEvent();
 
-                // Start a SQL command 
-                entityFrameworkCoreSource.Write("Microsoft.EntityFrameworkCore.BeforeExecuteCommand",
-                    new
-                    {
-                        Command = new
-                        {
-                            Connection = new
-                            {
-                                DataSource = "MyDataSource",
-                                Database = "MyDatabase",
-                            },
-                            CommandText = "MyCommand"
-                        }
-                    });
-                Assert.Equal(1, eventSourceListener.EventCount); // Exactly one more event has been emitted.
-                Assert.Equal("Activity2Start", eventSourceListener.LastEvent.EventSourceEventName);
-                Assert.Equal("Microsoft.EntityFrameworkCore", eventSourceListener.LastEvent.SourceName);
-                Assert.Equal("Microsoft.EntityFrameworkCore.BeforeExecuteCommand", eventSourceListener.LastEvent.EventName);
-                Assert.True(3 <= eventSourceListener.LastEvent.Arguments.Count);
-                Assert.Equal("MyDataSource", eventSourceListener.LastEvent.Arguments["DataSource"]);
-                Assert.Equal("MyDatabase", eventSourceListener.LastEvent.Arguments["Database"]);
-                Assert.Equal("MyCommand", eventSourceListener.LastEvent.Arguments["CommandText"]);
-                eventSourceListener.ResetEventCountAndLastEvent();
+        //        // Start a SQL command 
+        //        entityFrameworkCoreSource.Write("Microsoft.EntityFrameworkCore.BeforeExecuteCommand",
+        //            new
+        //            {
+        //                Command = new
+        //                {
+        //                    Connection = new
+        //                    {
+        //                        DataSource = "MyDataSource",
+        //                        Database = "MyDatabase",
+        //                    },
+        //                    CommandText = "MyCommand"
+        //                }
+        //            });
+        //        Assert.Equal(1, eventSourceListener.EventCount); // Exactly one more event has been emitted.
+        //        Assert.Equal("Activity2Start", eventSourceListener.LastEvent.EventSourceEventName);
+        //        Assert.Equal("Microsoft.EntityFrameworkCore", eventSourceListener.LastEvent.SourceName);
+        //        Assert.Equal("Microsoft.EntityFrameworkCore.BeforeExecuteCommand", eventSourceListener.LastEvent.EventName);
+        //        Assert.True(3 <= eventSourceListener.LastEvent.Arguments.Count);
+        //        Assert.Equal("MyDataSource", eventSourceListener.LastEvent.Arguments["DataSource"]);
+        //        Assert.Equal("MyDatabase", eventSourceListener.LastEvent.Arguments["Database"]);
+        //        Assert.Equal("MyCommand", eventSourceListener.LastEvent.Arguments["CommandText"]);
+        //        eventSourceListener.ResetEventCountAndLastEvent();
 
-                // Stop the SQL command 
-                entityFrameworkCoreSource.Write("Microsoft.EntityFrameworkCore.AfterExecuteCommand", null);
-                Assert.Equal(1, eventSourceListener.EventCount); // Exactly one more event has been emitted.
-                Assert.Equal("Activity2Stop", eventSourceListener.LastEvent.EventSourceEventName);
-                Assert.Equal("Microsoft.EntityFrameworkCore", eventSourceListener.LastEvent.SourceName);
-                Assert.Equal("Microsoft.EntityFrameworkCore.AfterExecuteCommand", eventSourceListener.LastEvent.EventName);
-                eventSourceListener.ResetEventCountAndLastEvent();
+        //        // Stop the SQL command 
+        //        entityFrameworkCoreSource.Write("Microsoft.EntityFrameworkCore.AfterExecuteCommand", null);
+        //        Assert.Equal(1, eventSourceListener.EventCount); // Exactly one more event has been emitted.
+        //        Assert.Equal("Activity2Stop", eventSourceListener.LastEvent.EventSourceEventName);
+        //        Assert.Equal("Microsoft.EntityFrameworkCore", eventSourceListener.LastEvent.SourceName);
+        //        Assert.Equal("Microsoft.EntityFrameworkCore.AfterExecuteCommand", eventSourceListener.LastEvent.EventName);
+        //        eventSourceListener.ResetEventCountAndLastEvent();
 
-                // Stop the ASP.NET request.  
-                aspNetCoreSource.Write("Microsoft.AspNetCore.Hosting.EndRequest",
-                    new
-                    {
-                        httpContext = new
-                        {
-                            Response = new
-                            {
-                                StatusCode = "200"
-                            },
-                            TraceIdentifier = "MyTraceId"
-                        }
-                    });
-                Assert.Equal(1, eventSourceListener.EventCount); // Exactly one more event has been emitted.
-                Assert.Equal("Activity1Stop", eventSourceListener.LastEvent.EventSourceEventName);
-                Assert.Equal("Microsoft.AspNetCore", eventSourceListener.LastEvent.SourceName);
-                Assert.Equal("Microsoft.AspNetCore.Hosting.EndRequest", eventSourceListener.LastEvent.EventName);
-                Assert.True(2 <= eventSourceListener.LastEvent.Arguments.Count);
-                Assert.Equal("MyTraceId", eventSourceListener.LastEvent.Arguments["TraceIdentifier"]);
-                Assert.Equal("200", eventSourceListener.LastEvent.Arguments["StatusCode"]);
-                eventSourceListener.ResetEventCountAndLastEvent();
-            }
-        }
+        //        // Stop the ASP.NET request.  
+        //        aspNetCoreSource.Write("Microsoft.AspNetCore.Hosting.EndRequest",
+        //            new
+        //            {
+        //                httpContext = new
+        //                {
+        //                    Response = new
+        //                    {
+        //                        StatusCode = "200"
+        //                    },
+        //                    TraceIdentifier = "MyTraceId"
+        //                }
+        //            });
+        //        Assert.Equal(1, eventSourceListener.EventCount); // Exactly one more event has been emitted.
+        //        Assert.Equal("Activity1Stop", eventSourceListener.LastEvent.EventSourceEventName);
+        //        Assert.Equal("Microsoft.AspNetCore", eventSourceListener.LastEvent.SourceName);
+        //        Assert.Equal("Microsoft.AspNetCore.Hosting.EndRequest", eventSourceListener.LastEvent.EventName);
+        //        Assert.True(2 <= eventSourceListener.LastEvent.Arguments.Count);
+        //        Assert.Equal("MyTraceId", eventSourceListener.LastEvent.Arguments["TraceIdentifier"]);
+        //        Assert.Equal("200", eventSourceListener.LastEvent.Arguments["StatusCode"]);
+        //        eventSourceListener.ResetEventCountAndLastEvent();
+        //    }
+        //}
     }
 
     /****************************************************************************/

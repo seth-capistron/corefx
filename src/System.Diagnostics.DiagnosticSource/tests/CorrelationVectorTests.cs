@@ -34,11 +34,11 @@ namespace System.Diagnostics.Tests
         public void ExtendAndIncrement()
         {
             string originalVector = "4I2lwitul4NUsfs9Cl7mOf.1";
-            var vector = CorrelationVector.Extend(originalVector);
+            CorrelationVector vector = CorrelationVector.Extend(originalVector);
 
             Assert.Equal(string.Concat(originalVector, ".0"), vector.ToString());
             
-            var incrementedVector = vector.Increment();
+            string incrementedVector = vector.Increment();
 
             Assert.Equal(string.Concat(originalVector, ".1"), vector.ToString());
         }
@@ -50,7 +50,7 @@ namespace System.Diagnostics.Tests
             string originalValue = "tul4NUsfs9Cl7mO.1";
 
             // This shouldn't throw
-            var vector = CorrelationVector.Extend(originalValue);
+            CorrelationVector vector = CorrelationVector.Extend(originalValue);
 
             Assert.Equal(string.Concat(originalValue, ".0"), vector.ToString());
 
@@ -66,7 +66,7 @@ namespace System.Diagnostics.Tests
             string originalValue = "tul4NUsfs9Cl7mOfN/dupsl.1";
 
             // This shouldn't throw
-            var vector = CorrelationVector.Extend(originalValue);
+            CorrelationVector vector = CorrelationVector.Extend(originalValue);
 
             Assert.Equal(string.Concat(originalValue, ".0"), vector.ToString());
 
@@ -79,7 +79,7 @@ namespace System.Diagnostics.Tests
         public void ExtendNullOrEmptyCorrelationVector()
         {
             // None of the below should throw
-            var vector = CorrelationVector.Extend(null);
+            CorrelationVector vector = CorrelationVector.Extend(null);
             Assert.Equal(".0", vector.ToString());
 
             vector = CorrelationVector.Extend(string.Empty);
@@ -96,7 +96,7 @@ namespace System.Diagnostics.Tests
             string originalValue = "KZY+dsX2jEaZesgCPjJ2Ng.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.201442.201442";
             string originalBase = originalValue.Substring(0, originalValue.IndexOf('.'));
 
-            var correlationVector = CorrelationVector.Extend(originalValue);
+            CorrelationVector correlationVector = CorrelationVector.Extend(originalValue);
             
             // Validate the properties of a Reset Correlation Vector
             Assert.StartsWith(ResetChar, correlationVector.Value);
@@ -114,7 +114,7 @@ namespace System.Diagnostics.Tests
             // Bigger than UInt.MaxValue
             string originalValue = "tul4NUsfs9Cl7mOf.11111111111111111111111111111";
 
-            var vector = CorrelationVector.Extend(originalValue);
+            CorrelationVector vector = CorrelationVector.Extend(originalValue);
 
             Assert.Equal(string.Concat(originalValue, ".0"), vector.ToString());
         }
@@ -125,7 +125,7 @@ namespace System.Diagnostics.Tests
             // Bigger than 127 characters
             string originalValue = "KZY+dsX2jEaZesgCPjJ2Ng.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647";
 
-            var vector = CorrelationVector.Extend(originalValue);
+            CorrelationVector vector = CorrelationVector.Extend(originalValue);
 
             Assert.StartsWith(ResetChar, vector.ToString());
             Assert.EndsWith(".0", vector.ToString());
@@ -138,7 +138,7 @@ namespace System.Diagnostics.Tests
             // Bigger than 127 characters
             string originalValue = "KZY+dsX2jEaZesgCPjJ2Ng21474836472147483647214748364721474836472147483647214748364721474836472147483647214748364721474836472147483647";
 
-            var vector = CorrelationVector.Extend(originalValue);
+            CorrelationVector vector = CorrelationVector.Extend(originalValue);
 
             Assert.StartsWith(ResetChar, vector.ToString());
             Assert.EndsWith(".0", vector.ToString());
@@ -148,15 +148,15 @@ namespace System.Diagnostics.Tests
         [Fact]
         public void IncrementCorrelationVector()
         {
-            var vector = new CorrelationVector();
+            CorrelationVector vector = new CorrelationVector();
 
-            var splitVector = vector.Value.Split('.');
+            string[] splitVector = vector.Value.Split('.');
 
             Assert.Equal(2, splitVector.Length);
             Assert.Equal(BaseLength, splitVector[0].Length);
             Assert.Equal("0", splitVector[1]);
 
-            var incrementedVector = vector.Increment();
+            string incrementedVector = vector.Increment();
             splitVector = incrementedVector.Split('.');
 
             Assert.Equal(incrementedVector, vector.Value);
@@ -228,7 +228,7 @@ namespace System.Diagnostics.Tests
         {
             var originalCorrelationVector = new CorrelationVector();
 
-            var correlationVector = CorrelationVector.Spin(originalCorrelationVector.Value);
+            CorrelationVector correlationVector = CorrelationVector.Spin(originalCorrelationVector.Value);
 
             Assert.StartsWith(
                 string.Concat(originalCorrelationVector.Value, SpinChar),
@@ -254,7 +254,7 @@ namespace System.Diagnostics.Tests
             string originalValue = "KZY+dsX2jEaZesgCPjJ2Ng.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442";
             string originalBase = originalValue.Substring(0, originalValue.IndexOf('.'));
 
-            var correlationVector = CorrelationVector.Spin(originalValue);
+            CorrelationVector correlationVector = CorrelationVector.Spin(originalValue);
 
             // Validate the properties of a Reset Correlation Vector
             Assert.StartsWith(ResetChar, correlationVector.Value);

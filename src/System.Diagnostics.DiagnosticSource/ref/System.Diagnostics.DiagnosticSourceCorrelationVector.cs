@@ -15,6 +15,7 @@ namespace System.Diagnostics
         public bool Equals(CorrelationVector correlationVector) { throw null; }
         public string Increment() { throw null; }
         public static CorrelationVector Extend(string correlationVector) { throw null; }
+        public static CorrelationVector FromActivityId(string activityId) { throw null; }
         public static CorrelationVector Spin(string correlationVector) { throw null; }
     }
 }

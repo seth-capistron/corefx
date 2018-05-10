@@ -99,42 +99,42 @@ namespace System.Diagnostics.Tests
             Assert.Equal(1, result.Count);
         }
 
-        /// <summary>
-        /// Simple tests for the IsEnabled method.
-        /// </summary>
-        [Fact]
-        public void BasicIsEnabled()
-        {
-            using (DiagnosticListener listener = new DiagnosticListener("Testing"))
-            {
-                DiagnosticSource source = listener;
-                var result = new List<KeyValuePair<string, object>>();
+        ///// <summary>
+        ///// Simple tests for the IsEnabled method.
+        ///// </summary>
+        //[Fact]
+        //public void BasicIsEnabled()
+        //{
+        //    using (DiagnosticListener listener = new DiagnosticListener("Testing"))
+        //    {
+        //        DiagnosticSource source = listener;
+        //        var result = new List<KeyValuePair<string, object>>();
 
-                bool seenUninteresting = false;
-                bool seenStructPayload = false;
-                Predicate<string> predicate = delegate (string name)
-                {
-                    if (name == "Uninteresting")
-                        seenUninteresting = true;
-                    if (name == "StructPayload")
-                        seenStructPayload = true;
+        //        bool seenUninteresting = false;
+        //        bool seenStructPayload = false;
+        //        Predicate<string> predicate = delegate (string name)
+        //        {
+        //            if (name == "Uninteresting")
+        //                seenUninteresting = true;
+        //            if (name == "StructPayload")
+        //                seenStructPayload = true;
 
-                    return name == "StructPayload";
-                };
+        //            return name == "StructPayload";
+        //        };
 
-                Assert.False(listener.IsEnabled());
-                using (listener.Subscribe(new ObserverToList<TelemData>(result), predicate))
-                {
-                    Assert.False(source.IsEnabled("Uninteresting"));
-                    Assert.False(source.IsEnabled("Uninteresting", "arg1", "arg2"));
-                    Assert.True(source.IsEnabled("StructPayload"));
-                    Assert.True(source.IsEnabled("StructPayload", "arg1", "arg2"));
-                    Assert.True(seenUninteresting);
-                    Assert.True(seenStructPayload);
-                    Assert.True(listener.IsEnabled());
-                }
-            }
-        }
+        //        Assert.False(listener.IsEnabled());
+        //        using (listener.Subscribe(new ObserverToList<TelemData>(result), predicate))
+        //        {
+        //            Assert.False(source.IsEnabled("Uninteresting"));
+        //            Assert.False(source.IsEnabled("Uninteresting", "arg1", "arg2"));
+        //            Assert.True(source.IsEnabled("StructPayload"));
+        //            Assert.True(source.IsEnabled("StructPayload", "arg1", "arg2"));
+        //            Assert.True(seenUninteresting);
+        //            Assert.True(seenStructPayload);
+        //            Assert.True(listener.IsEnabled());
+        //        }
+        //    }
+        //}
 
         /// <summary>
         /// Simple tests for the IsEnabled method.

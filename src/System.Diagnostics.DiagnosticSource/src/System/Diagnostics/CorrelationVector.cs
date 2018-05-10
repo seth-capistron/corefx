@@ -137,6 +137,18 @@ namespace System.Diagnostics
         }
 
         /// <summary>
+        /// TBD...
+        /// </summary>
+        /// <param name="activityId">TBD...</param>
+        /// <returns>TBD...</returns>
+        public static CorrelationVector FromActivityId(string activityId)
+        {
+
+
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
         /// TBD - describe this thing
         /// </summary>
         /// <param name="correlationVector">
