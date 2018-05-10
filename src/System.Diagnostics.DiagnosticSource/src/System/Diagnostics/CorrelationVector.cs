@@ -12,7 +12,7 @@ namespace System.Diagnostics
     /// </summary>
     public class CorrelationVector
     {
-        private const byte BaseLength = 22;
+        private const byte BaseLength = 23;
         private const byte MaxVectorLength = 127;
 
         private const char ElementChar = '.';
@@ -31,14 +31,18 @@ namespace System.Diagnostics
         /// </summary>
         public CorrelationVector()
         {
-            _baseVector = CorrelationVector.GetBase(isReset: false);
+            string generatedCharacters = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+
+            _baseVector = string.Concat(
+                generatedCharacters.Substring(0, CorrelationVector.BaseLength - 1),
+                VersionChar);
         }
 
         /// <summary>
-        /// Gets the previous value of the Vector Base prior to a reset having been performed.
+        /// Gets the previous value of the Vector prior to a reset having been performed.
         /// Value will be null if reset has not yet been performed.
         /// </summary>
-        public string PreviousBase { get; private set; } = null;
+        public string PreviousValue { get; private set; } = null;
 
         /// <summary>
         /// Gets the value of the Correlation Vector as a string.
@@ -82,8 +86,8 @@ namespace System.Diagnostics
                         size = _baseVector.Length + 1 + (int)Math.Log10(next) + 1;
                         if (size > CorrelationVector.MaxVectorLength)
                         {
-                            PreviousBase = GetBaseFromVector(_baseVector);
-                            _baseVector = CorrelationVector.GetBase(isReset: true);
+                            PreviousValue = Value;
+                            _baseVector = ResetVector(_baseVector);
                         }
                     }
                 }
@@ -126,9 +130,9 @@ namespace System.Diagnostics
             {
                 return new CorrelationVector()
                 {
-                    _baseVector = CorrelationVector.GetBase(isReset: true),
+                    _baseVector = ResetVector(correlationVector),
                     _extension = 0,
-                    PreviousBase = GetBaseFromVector(correlationVector)
+                    PreviousValue = correlationVector
                 };
             }
 
@@ -148,16 +152,8 @@ namespace System.Diagnostics
         /// <returns>A new correlation vector extended from the current vector.</returns>
         public static CorrelationVector Spin(string correlationVector)
         {
-            byte[] entropy = new byte[4];
-            randomGenerator.NextBytes(entropy);
+            ulong spinElement = GetTimeSortedRandomLong();
 
-            ulong spinElement = (ulong)(DateTime.UtcNow.Ticks >> 16);
-
-            for (int i=0; i < 4; i++)
-            {
-                spinElement = (spinElement << 8) | Convert.ToUInt64(entropy[i]);
-            }
-                        
             // 3 accounts for the "_" before the spin element and the
             // ".0" at the end of the new CorrelationVector
             int size = correlationVector.Length + 3 + (int)Math.Log10(spinElement) + 1;
@@ -166,9 +162,9 @@ namespace System.Diagnostics
             {
                 return new CorrelationVector()
                 {
-                    _baseVector = CorrelationVector.GetBase(isReset: true),
+                    _baseVector = ResetVector(correlationVector),
                     _extension = 0,
-                    PreviousBase = GetBaseFromVector(correlationVector)
+                    PreviousValue = correlationVector
                 };
             }
 
@@ -188,33 +184,42 @@ namespace System.Diagnostics
             return Value;
         }
 
-        private static string GetBase(bool isReset)
-        {
-            string generatedCharacters = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-
-            // If isReset, then prepend '#'. Length will always be 22 total, including 
-            // '#' (if present) and the leading version character 'A'.
-            return string.Concat(
-                isReset ? ResetChar.ToString() : string.Empty,
-                VersionChar,
-                generatedCharacters.Substring(0, CorrelationVector.BaseLength - (isReset ? 1 : 0) - 1));
-        }
-
         private static string GetBaseFromVector(string correlationVector)
         {
-            if (correlationVector == null || correlationVector.IndexOf(ElementChar) < 0)
+            if (correlationVector == null)
             {
                 return correlationVector;
+            }
+
+            if (correlationVector.IndexOf(ElementChar) < 0)
+            {
+                // Not a well-formed vector, just assume the first 23 characters are the base
+                return correlationVector.Substring(0, BaseLength);
             }
 
             return correlationVector.Substring(0, correlationVector.IndexOf(ElementChar));
         }
 
-        private static unsafe ulong GetRandomUnsignedLong()
+        private static ulong GetTimeSortedRandomLong()
         {
-            // Use the first 8 bytes of the GUID as a random number.  
-            Guid g = Guid.NewGuid();
-            return *((ulong*)&g);
+            byte[] entropy = new byte[4];
+            randomGenerator.NextBytes(entropy);
+
+            ulong spinElement = (ulong)(DateTime.UtcNow.Ticks >> 16);
+
+            for (int i = 0; i < 4; i++)
+            {
+                spinElement = (spinElement << 8) | Convert.ToUInt64(entropy[i]);
+            }
+
+            return spinElement;
+        }
+
+        private static string ResetVector(string correlationVector)
+        {
+            string baseVector = GetBaseFromVector(correlationVector);
+
+            return string.Concat(baseVector, ElementChar, ResetChar, GetTimeSortedRandomLong());
         }
     }
 }

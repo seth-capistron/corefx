@@ -11,7 +11,7 @@ namespace System.Diagnostics.Tests
 {
     public class CorrelationVectorTests
     {
-        private const int BaseLength = 22;
+        private const int BaseLength = 23;
         private const int MaxVectorLength = 127;
 
         private const string ResetChar = "#";
@@ -24,16 +24,17 @@ namespace System.Diagnostics.Tests
 
             Assert.NotNull(correlationVector.Value);
             Assert.False(string.IsNullOrWhiteSpace(correlationVector.Value));
-            Assert.Equal(24, correlationVector.Value.Length);
+            // +2 accounts for .0
+            Assert.Equal(BaseLength + 2, correlationVector.Value.Length);
             Assert.True(correlationVector.Value.EndsWith(".0"));
             Assert.Equal(1, correlationVector.Value.Count(c => c == '.'));
-            Assert.Null(correlationVector.PreviousBase);
+            Assert.Null(correlationVector.PreviousValue);
         }
 
         [Fact]
         public void ExtendAndIncrement()
         {
-            string originalVector = "4I2lwitul4NUsfs9Cl7mOf.1";
+            string originalVector = "4I2lwitul4NUsfs9Cl7mOfA.1";
             var vector = CorrelationVector.Extend(originalVector);
 
             Assert.Equal(string.Concat(originalVector, ".0"), vector.ToString());
@@ -47,7 +48,7 @@ namespace System.Diagnostics.Tests
         public void ExtendAndIncrementWithInsufficientBaseCharacters()
         {
             // Less than 22 characters in the base
-            string originalValue = "tul4NUsfs9Cl7mO.1";
+            string originalValue = "tul4NUsfs9Cl7mOA.1";
 
             // This shouldn't throw
             var vector = CorrelationVector.Extend(originalValue);
@@ -63,7 +64,7 @@ namespace System.Diagnostics.Tests
         public void ExtendAndIncrementWithTooManyBaseCharacters()
         {
             // Greater than 22 characters in the base
-            string originalValue = "tul4NUsfs9Cl7mOfN/dupsl.1";
+            string originalValue = "tul4NUsfs9Cl7mOfN/dupslA.1";
 
             // This shouldn't throw
             var vector = CorrelationVector.Extend(originalValue);
@@ -93,26 +94,54 @@ namespace System.Diagnostics.Tests
         public void ExtendTriggersReset()
         {
             // 126 characters (will be 128 after an Extend)
-            string originalValue = "KZY+dsX2jEaZesgCPjJ2Ng.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.201442.201442";
-            string originalBase = originalValue.Substring(0, originalValue.IndexOf('.'));
+            string originalValue = "KZY+dsX2jEaZesgCPjJ2NgA.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.201442.20144";
 
             var correlationVector = CorrelationVector.Extend(originalValue);
 
-            // Validate the properties of a Reset Correlation Vector
-            Assert.StartsWith(ResetChar, correlationVector.Value);
-            Assert.EndsWith(".0", correlationVector.Value);
-            Assert.DoesNotContain(originalBase, correlationVector.Value);
-            Assert.Equal(
-                BaseLength,
-                correlationVector.Value.Substring(0, correlationVector.Value.IndexOf('.')).Length);
-            Assert.Equal(originalBase, correlationVector.PreviousBase);
+            ValidateResetCorrelationVector(originalValue, correlationVector, expectedExtension: "0");
+        }
+
+        [Fact]
+        public void ExtendTriggersResetSortValidation()
+        {
+            // 126 characters (will be 128 after an Extend)
+            string originalValue = "KZY+dsX2jEaZesgCPjJ2NgA.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.201442.20144";
+            ulong lastResetValue = 0;
+            int wrappedCounter = 0;
+
+            for (int i = 0; i < 100; i++)
+            {
+                CorrelationVector extendedVector = CorrelationVector.Extend(originalValue);
+
+                ValidateResetCorrelationVector(originalValue, extendedVector, expectedExtension: "0");
+
+                // The cV after an Extend that got reset will look like <cvBase>.#<resetValue>.0, 
+                // so the resetValue is at index = 1.
+                string spinElement = extendedVector.Value.Split('.')[1].Replace(ResetChar, string.Empty);
+
+                ulong resetValue = ulong.Parse(spinElement);
+
+                // Count the number of times the counter wraps.
+                if (resetValue <= lastResetValue)
+                {
+                    wrappedCounter++;
+                }
+
+                lastResetValue = resetValue;
+
+                // Wait for 10ms.
+                Task.Delay(10).Wait();
+            }
+
+            // The counter should wrap at most 1 time.
+            Assert.True(wrappedCounter <= 1);
         }
 
         [Fact]
         public void ExtendWithTooBigExtension()
         {
             // Bigger than UInt.MaxValue
-            string originalValue = "tul4NUsfs9Cl7mOf.11111111111111111111111111111";
+            string originalValue = "tul4NUsfs9Cl7mOfA.11111111111111111111111111111";
 
             var vector = CorrelationVector.Extend(originalValue);
 
@@ -123,26 +152,31 @@ namespace System.Diagnostics.Tests
         public void ExtendWithTooBigValue()
         {
             // Bigger than 127 characters
-            string originalValue = "KZY+dsX2jEaZesgCPjJ2Ng.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647";
+            string originalValue = "KZY+dsX2jEaZesgCPjJ2NgA.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.214748364";
 
             var vector = CorrelationVector.Extend(originalValue);
-
-            Assert.StartsWith(ResetChar, vector.ToString());
-            Assert.EndsWith(".0", vector.ToString());
-            Assert.Equal(originalValue.Substring(0, originalValue.IndexOf('.')), vector.PreviousBase);
+            
+            ValidateResetCorrelationVector(originalValue, vector, expectedExtension: "0");
         }
 
         [Fact]
         public void ExtendWithTooBigValueAndNoDot()
         {
             // Bigger than 127 characters
-            string originalValue = "KZY+dsX2jEaZesgCPjJ2Ng21474836472147483647214748364721474836472147483647214748364721474836472147483647214748364721474836472147483647";
+            string originalValue = "KZY+dsX2jEaZesgCPjJ2NgA2147483647214748364721474836472147483647214748364721474836472147483647214748364721474836472147483647214748364";
 
             var vector = CorrelationVector.Extend(originalValue);
 
-            Assert.StartsWith(ResetChar, vector.ToString());
-            Assert.EndsWith(".0", vector.ToString());
-            Assert.Equal(originalValue, vector.PreviousBase);
+            string[] parts = vector.Value.Split('.');
+            ulong resetElement;
+
+            // Extend should take the first 23 characters and assume it's the vector base
+            Assert.Equal(originalValue.Substring(0, BaseLength), parts[0]);
+            Assert.StartsWith(ResetChar, parts[1]);
+            Assert.True(ulong.TryParse(parts[1].Substring(1), out resetElement));
+            Assert.Equal("0", parts[2]);
+
+            Assert.Equal(originalValue, vector.PreviousValue);
         }
 
         [Fact]
@@ -191,8 +225,8 @@ namespace System.Diagnostics.Tests
         public void IncrementTriggersReset()
         {
             // 125 characters (will be 127 after an Extend)
-            string originalValue = "KZY+dsX2jEaZesgCPjJ2Ng.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.201442";
-            string originalBase = originalValue.Substring(0, originalValue.IndexOf('.'));
+            string originalValue = "KZY+dsX2jEaZesgCPjJ2NgA.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20144";
+            string incrementedValue = null;
 
             CorrelationVector aboutToOverflow = CorrelationVector.Extend(originalValue);
 
@@ -201,7 +235,7 @@ namespace System.Diagnostics.Tests
 
             for (int i = 1; i < 10; i++)
             {
-                string incrementedValue = aboutToOverflow.Increment();
+                incrementedValue = aboutToOverflow.Increment();
 
                 Assert.Equal(string.Concat(originalValue, ".", i), aboutToOverflow.Value);
             }
@@ -210,12 +244,10 @@ namespace System.Diagnostics.Tests
             aboutToOverflow.Increment();
 
             // Validate the properties of a Reset Correlation Vector
-            Assert.StartsWith(ResetChar, aboutToOverflow.Value);
-            Assert.EndsWith(".10", aboutToOverflow.Value);
-            Assert.Equal(1, aboutToOverflow.Value.Count(c => c == '.'));
-            Assert.DoesNotContain(originalBase, aboutToOverflow.Value);
-            Assert.Equal(BaseLength, aboutToOverflow.Value.Substring(0, aboutToOverflow.Value.IndexOf('.')).Length);
-            Assert.Equal(originalBase, aboutToOverflow.PreviousBase);
+            ValidateResetCorrelationVector(
+                preResetValue: incrementedValue,
+                resetVector: aboutToOverflow,
+                expectedExtension: "10");
 
             // Validate that an additional Increment behaves like normal
             aboutToOverflow.Increment();
@@ -283,19 +315,30 @@ namespace System.Diagnostics.Tests
         public void SpinTriggersReset()
         {
             // 124 characters, which will gaurantee that Spin will cause a Reset
-            string originalValue = "KZY+dsX2jEaZesgCPjJ2Ng.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442";
+            string originalValue = "KZY+dsX2jEaZesgCPjJ2NgA.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.20442.2044";
             string originalBase = originalValue.Substring(0, originalValue.IndexOf('.'));
 
             var correlationVector = CorrelationVector.Spin(originalValue);
 
-            // Validate the properties of a Reset Correlation Vector
-            Assert.StartsWith(ResetChar, correlationVector.Value);
-            Assert.EndsWith(".0", correlationVector.Value);
-            Assert.DoesNotContain(originalBase, correlationVector.Value);
-            Assert.Equal(
-                BaseLength,
-                correlationVector.Value.Substring(0, correlationVector.Value.IndexOf('.')).Length);
-            Assert.Equal(originalBase, correlationVector.PreviousBase);
+            ValidateResetCorrelationVector(originalValue, correlationVector, expectedExtension: "0");
+        }
+
+        private void ValidateResetCorrelationVector(
+            string preResetValue,
+            CorrelationVector resetVector,
+            string expectedExtension)
+        {
+            string originalBase = preResetValue.Substring(0, preResetValue.IndexOf('.'));
+
+            string[] parts = resetVector.Value.Split('.');
+            ulong resetElement;
+
+            Assert.Equal(originalBase, parts[0]);
+            Assert.StartsWith(ResetChar, parts[1]);
+            Assert.True(ulong.TryParse(parts[1].Substring(1), out resetElement));
+            Assert.Equal(expectedExtension, parts[2]);
+
+            Assert.Equal(preResetValue, resetVector.PreviousValue);
         }
     }
 }

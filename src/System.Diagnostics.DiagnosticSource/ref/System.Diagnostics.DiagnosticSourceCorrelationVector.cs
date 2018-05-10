@@ -10,7 +10,7 @@ namespace System.Diagnostics
     public partial class CorrelationVector
     {
         public CorrelationVector() { }
-        public string PreviousBase { get { throw null; } }
+        public string PreviousValue { get { throw null; } }
         public string Value { get { throw null; } }
         public bool Equals(CorrelationVector correlationVector) { throw null; }
         public string Increment() { throw null; }
