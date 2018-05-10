@@ -36,6 +36,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'uap-Windows_NT-Release|AnyCPU'" />
   <ItemGroup>
     <Compile Include="System\Diagnostics\CorrelationVector.cs" />
+    <Compile Include="System\Diagnostics\CorrelationVectorResetResult.cs" />
     <Compile Include="System\Diagnostics\DiagnosticSource.cs" />
     <Compile Include="System\Diagnostics\DiagnosticListener.cs" />
     <Compile Include="System\Diagnostics\DiagnosticSourceEventSource.cs" />

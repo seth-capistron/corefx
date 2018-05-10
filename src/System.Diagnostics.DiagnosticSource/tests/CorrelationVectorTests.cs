@@ -29,7 +29,7 @@ namespace System.Diagnostics.Tests
             Assert.Equal(BaseLength + 2, correlationVector.Value.Length);
             Assert.True(correlationVector.Value.EndsWith(".0"));
             Assert.Equal(1, correlationVector.Value.Count(c => c == '.'));
-            Assert.Null(correlationVector.PreviousValue);
+            Assert.Null(correlationVector.ResetResult);
         }
 
         [Fact]
@@ -185,7 +185,9 @@ namespace System.Diagnostics.Tests
                     out resetElement));
             Assert.Equal("0", parts[2]);
 
-            Assert.Equal(originalValue, vector.PreviousValue);
+            Assert.NotNull(vector.ResetResult);
+            Assert.Equal(originalValue, vector.ResetResult.BaseVector);
+            Assert.Equal(parts[1].Substring(1), vector.ResetResult.ResetExtension);
         }
 
         [Fact]
@@ -279,8 +281,9 @@ namespace System.Diagnostics.Tests
             aboutToOverflow.Increment();
 
             // Validate the properties of a Reset Correlation Vector
+            // The stored pre-reset BaseVector should not contain the last ".F", so remove it
             ValidateResetCorrelationVector(
-                preResetValue: incrementedValue,
+                preResetValue: incrementedValue.Replace(".F", string.Empty),
                 resetVector: aboutToOverflow,
                 expectedExtension: 16);
 
@@ -386,7 +389,9 @@ namespace System.Diagnostics.Tests
                     out resetElement));
             Assert.Equal(expectedExtension.ToString("X"), parts[2]);
 
-            Assert.Equal(preResetValue, resetVector.PreviousValue);
+            Assert.NotNull(resetVector.ResetResult);
+            Assert.Equal(preResetValue, resetVector.ResetResult.BaseVector);
+            Assert.Equal(parts[1].Substring(1), resetVector.ResetResult.ResetExtension);
         }
     }
 }
