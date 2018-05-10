@@ -37,7 +37,7 @@ namespace System.Diagnostics.Tests
             var vector = CorrelationVector.Extend(originalVector);
 
             Assert.Equal(string.Concat(originalVector, ".0"), vector.ToString());
-            
+
             var incrementedVector = vector.Increment();
 
             Assert.Equal(string.Concat(originalVector, ".1"), vector.ToString());
@@ -97,7 +97,7 @@ namespace System.Diagnostics.Tests
             string originalBase = originalValue.Substring(0, originalValue.IndexOf('.'));
 
             var correlationVector = CorrelationVector.Extend(originalValue);
-            
+
             // Validate the properties of a Reset Correlation Vector
             Assert.StartsWith(ResetChar, correlationVector.Value);
             Assert.EndsWith(".0", correlationVector.Value);
@@ -199,7 +199,7 @@ namespace System.Diagnostics.Tests
             Assert.Equal(string.Concat(originalValue, ".0"), aboutToOverflow.Value);
             Assert.Equal(127, aboutToOverflow.Value.Length);
 
-            for (int i=1; i<10; i++)
+            for (int i = 1; i < 10; i++)
             {
                 string incrementedValue = aboutToOverflow.Increment();
 
@@ -219,7 +219,7 @@ namespace System.Diagnostics.Tests
 
             // Validate that an additional Increment behaves like normal
             aboutToOverflow.Increment();
-            
+
             Assert.EndsWith(".11", aboutToOverflow.Value);
         }
 
@@ -245,6 +245,38 @@ namespace System.Diagnostics.Tests
             ulong spinElement;
 
             Assert.True(ulong.TryParse(spinElementString, out spinElement));
+        }
+
+        [Fact]
+        public void SpinSortValidation()
+        {
+            var vector = new CorrelationVector();
+            ulong lastSpinValue = 0;
+            int wrappedCounter = 0;
+
+            for (int i = 0; i < 100; i++)
+            {
+                CorrelationVector spunVector = CorrelationVector.Spin(vector.Value);
+                
+                // The cV after a Spin will look like <cvBase>.0_<spinValue>.0, so the spinValue is at index = 2.
+                string spinElement = spunVector.Value.Split('_')[1].Replace(".0", string.Empty);
+
+                ulong spinValue = ulong.Parse(spinElement);
+
+                // Count the number of times the counter wraps.
+                if (spinValue <= lastSpinValue)
+                {
+                    wrappedCounter++;
+                }
+
+                lastSpinValue = spinValue;
+
+                // Wait for 10ms.
+                Task.Delay(10).Wait();
+            }
+
+            // The counter should wrap at most 1 time.
+            Assert.True(wrappedCounter <= 1);
         }
 
         [Fact]

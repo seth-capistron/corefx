@@ -18,10 +18,13 @@ namespace System.Diagnostics
         private const char ElementChar = '.';
         private const char ResetChar = '#';
         private const char SpinChar = '_';
+        private const char VersionChar = 'A';
 
         private string _baseVector = null;
         private int _extension = 0;
         private object _resetLock = new object();
+
+        private static Random randomGenerator = new Random();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CorrelationVector"/> class.
@@ -145,8 +148,16 @@ namespace System.Diagnostics
         /// <returns>A new correlation vector extended from the current vector.</returns>
         public static CorrelationVector Spin(string correlationVector)
         {
-            ulong spinElement = GetRandomUnsignedLong();
-            
+            byte[] entropy = new byte[4];
+            randomGenerator.NextBytes(entropy);
+
+            ulong spinElement = (ulong)(DateTime.UtcNow.Ticks >> 16);
+
+            for (int i=0; i < 4; i++)
+            {
+                spinElement = (spinElement << 8) | Convert.ToUInt64(entropy[i]);
+            }
+                        
             // 3 accounts for the "_" before the spin element and the
             // ".0" at the end of the new CorrelationVector
             int size = correlationVector.Length + 3 + (int)Math.Log10(spinElement) + 1;
@@ -181,10 +192,12 @@ namespace System.Diagnostics
         {
             string generatedCharacters = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
 
-            // If isReset, then prepend '#'. Length will always be 22 total (including '#', if present).
+            // If isReset, then prepend '#'. Length will always be 22 total, including 
+            // '#' (if present) and the leading version character 'A'.
             return string.Concat(
                 isReset ? ResetChar.ToString() : string.Empty,
-                generatedCharacters.Substring(0, CorrelationVector.BaseLength - (isReset ? 1 : 0)));
+                VersionChar,
+                generatedCharacters.Substring(0, CorrelationVector.BaseLength - (isReset ? 1 : 0) - 1));
         }
 
         private static string GetBaseFromVector(string correlationVector)
