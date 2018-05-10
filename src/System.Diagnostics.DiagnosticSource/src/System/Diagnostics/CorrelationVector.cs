@@ -42,7 +42,7 @@ namespace System.Diagnostics
         /// Gets the previous value of the Vector prior to a reset having been performed.
         /// Value will be null if reset has not yet been performed.
         /// </summary>
-        public string PreviousValue { get; private set; } = null;
+        public CorrelationVectorResetResult ResetResult { get; private set; } = null;
 
         /// <summary>
         /// Gets the value of the Correlation Vector as a string.
@@ -77,17 +77,26 @@ namespace System.Diagnostics
                 }
                 next = snapshot + 1;
                 int size = _baseVector.Length + 1 + (int)Math.Log(next, 16) + 1;
-                if (size > CorrelationVector.MaxVectorLength)
+                if (size > MaxVectorLength)
                 {
                     // Perform a reset
                     lock (_resetLock)
                     {
                         // Check size again in case another thread did the reset
                         size = _baseVector.Length + 1 + (int)Math.Log(next, 16) + 1;
-                        if (size > CorrelationVector.MaxVectorLength)
+                        if (size > MaxVectorLength)
                         {
-                            PreviousValue = Value;
-                            _baseVector = ResetVector(_baseVector);
+                            string previousVectorBase = _baseVector;
+                            string resetExtension;
+
+                            _baseVector = ResetVector(_baseVector, out resetExtension);
+
+                            ResetResult = new CorrelationVectorResetResult()
+                            {
+                                BaseVector = previousVectorBase,
+                                ResetExtension = resetExtension
+                            };
+                            
                         }
                     }
                 }
@@ -126,14 +135,9 @@ namespace System.Diagnostics
             // 2 accounts for the ".0" at the end of the new CorrelationVector
             int size = ((correlationVector == null) ? 0 : correlationVector.Length) + 2;
 
-            if (size > CorrelationVector.MaxVectorLength)
+            if (size > MaxVectorLength)
             {
-                return new CorrelationVector()
-                {
-                    _baseVector = ResetVector(correlationVector),
-                    _extension = 0,
-                    PreviousValue = correlationVector
-                };
+                return CreateResetCorrelationVector(correlationVector);
             }
 
             return new CorrelationVector()
@@ -152,23 +156,18 @@ namespace System.Diagnostics
         /// <returns>A new correlation vector extended from the current vector.</returns>
         public static CorrelationVector Spin(string correlationVector)
         {
-            ulong spinElement = GetTimeSortedRandomLong();
-
             // 3 accounts for the "_" before the spin element and the
             // ".0" at the end of the new CorrelationVector. Use the
             // max length of a long represented in hex, as that is worst-
             // case for the spin element.
             int size = correlationVector.Length + 3 + (int)Math.Log(ulong.MaxValue, 16) + 1;
 
-            if (size > CorrelationVector.MaxVectorLength)
+            if (size > MaxVectorLength)
             {
-                return new CorrelationVector()
-                {
-                    _baseVector = ResetVector(correlationVector),
-                    _extension = 0,
-                    PreviousValue = correlationVector
-                };
+                return CreateResetCorrelationVector(correlationVector);
             }
+
+            ulong spinElement = GetTimeSortedRandomLong();
 
             return new CorrelationVector()
             {
@@ -184,6 +183,23 @@ namespace System.Diagnostics
         public override string ToString()
         {
             return Value;
+        }
+
+        private static CorrelationVector CreateResetCorrelationVector(string correlationVector)
+        {
+            string resetExtension;
+            string baseVector = ResetVector(correlationVector, out resetExtension);
+
+            return new CorrelationVector()
+            {
+                _baseVector = baseVector,
+                _extension = 0,
+                ResetResult = new CorrelationVectorResetResult()
+                {
+                    BaseVector = correlationVector,
+                    ResetExtension = resetExtension
+                }
+            };
         }
 
         private static string GetBaseFromVector(string correlationVector)
@@ -220,15 +236,16 @@ namespace System.Diagnostics
             return spinElement;
         }
 
-        private static string ResetVector(string correlationVector)
+        private static string ResetVector(string correlationVector, out string resetExtension)
         {
             string baseVector = GetBaseFromVector(correlationVector);
+            resetExtension = GetTimeSortedRandomLong().ToString("X");
 
             return string.Concat(
                 baseVector,
                 ElementChar,
                 ResetChar,
-                GetTimeSortedRandomLong().ToString("X"));
+                resetExtension);
         }
     }
 }
