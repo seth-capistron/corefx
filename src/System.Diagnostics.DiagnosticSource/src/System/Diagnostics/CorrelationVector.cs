@@ -155,8 +155,10 @@ namespace System.Diagnostics
             ulong spinElement = GetTimeSortedRandomLong();
 
             // 3 accounts for the "_" before the spin element and the
-            // ".0" at the end of the new CorrelationVector
-            int size = correlationVector.Length + 3 + (int)Math.Log(spinElement, 16) + 1;
+            // ".0" at the end of the new CorrelationVector. Use the
+            // max length of a long represented in hex, as that is worst-
+            // case for the spin element.
+            int size = correlationVector.Length + 3 + (int)Math.Log(ulong.MaxValue, 16) + 1;
 
             if (size > CorrelationVector.MaxVectorLength)
             {
@@ -205,8 +207,11 @@ namespace System.Diagnostics
             byte[] entropy = new byte[4];
             randomGenerator.NextBytes(entropy);
 
+            // spinElement will increment every ~6.5 milliseconds
             ulong spinElement = (ulong)(DateTime.UtcNow.Ticks >> 16);
 
+            // spinElement will form the most significant 4-byte section and
+            // entropy will form the least significant 4-byte section
             for (int i = 0; i < 4; i++)
             {
                 spinElement = (spinElement << 8) | Convert.ToUInt64(entropy[i]);
