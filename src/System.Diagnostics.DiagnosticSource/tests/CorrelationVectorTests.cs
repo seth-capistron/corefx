@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
@@ -98,7 +99,7 @@ namespace System.Diagnostics.Tests
 
             var correlationVector = CorrelationVector.Extend(originalValue);
 
-            ValidateResetCorrelationVector(originalValue, correlationVector, expectedExtension: "0");
+            ValidateResetCorrelationVector(originalValue, correlationVector, expectedExtension: 0);
         }
 
         [Fact]
@@ -113,13 +114,16 @@ namespace System.Diagnostics.Tests
             {
                 CorrelationVector extendedVector = CorrelationVector.Extend(originalValue);
 
-                ValidateResetCorrelationVector(originalValue, extendedVector, expectedExtension: "0");
+                ValidateResetCorrelationVector(originalValue, extendedVector, expectedExtension: 0);
 
                 // The cV after an Extend that got reset will look like <cvBase>.#<resetValue>.0, 
                 // so the resetValue is at index = 1.
-                string spinElement = extendedVector.Value.Split('.')[1].Replace(ResetChar, string.Empty);
+                string resetElement = extendedVector.Value.Split('.')[1].Replace(ResetChar, string.Empty);
 
-                ulong resetValue = ulong.Parse(spinElement);
+                ulong resetValue = ulong.Parse(
+                    resetElement,
+                    NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture);
 
                 // Count the number of times the counter wraps.
                 if (resetValue <= lastResetValue)
@@ -155,8 +159,8 @@ namespace System.Diagnostics.Tests
             string originalValue = "KZY+dsX2jEaZesgCPjJ2NgA.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.2147483647.214748364";
 
             var vector = CorrelationVector.Extend(originalValue);
-            
-            ValidateResetCorrelationVector(originalValue, vector, expectedExtension: "0");
+
+            ValidateResetCorrelationVector(originalValue, vector, expectedExtension: 0);
         }
 
         [Fact]
@@ -173,7 +177,12 @@ namespace System.Diagnostics.Tests
             // Extend should take the first 23 characters and assume it's the vector base
             Assert.Equal(originalValue.Substring(0, BaseLength), parts[0]);
             Assert.StartsWith(ResetChar, parts[1]);
-            Assert.True(ulong.TryParse(parts[1].Substring(1), out resetElement));
+            Assert.True(
+                ulong.TryParse(
+                    parts[1].Substring(1),
+                    NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture,
+                    out resetElement));
             Assert.Equal("0", parts[2]);
 
             Assert.Equal(originalValue, vector.PreviousValue);
@@ -196,6 +205,32 @@ namespace System.Diagnostics.Tests
             Assert.Equal(incrementedVector, vector.Value);
             Assert.Equal(2, splitVector.Length);
             Assert.Equal("1", splitVector[1]);
+        }
+
+        [Fact]
+        public void IncrementEncodesExtensionAsHex()
+        {
+            CorrelationVector correlationVector = new CorrelationVector();
+
+            for (int i = 1; i < 20; i++)
+            {
+                string returnedValue = correlationVector.Increment();
+
+                Assert.Equal(returnedValue, correlationVector.Value);
+                Assert.Equal(returnedValue, correlationVector.ToString());
+
+                string[] parts = correlationVector.Value.Split('.');
+                int extension;
+
+                Assert.True(
+                    int.TryParse(
+                        parts[1],
+                        NumberStyles.HexNumber,
+                        CultureInfo.InvariantCulture,
+                        out extension));
+
+                Assert.Equal(i, extension);
+            }
         }
 
         [Fact]
@@ -233,11 +268,11 @@ namespace System.Diagnostics.Tests
             Assert.Equal(string.Concat(originalValue, ".0"), aboutToOverflow.Value);
             Assert.Equal(127, aboutToOverflow.Value.Length);
 
-            for (int i = 1; i < 10; i++)
+            for (int i = 1; i < 16; i++)
             {
                 incrementedValue = aboutToOverflow.Increment();
 
-                Assert.Equal(string.Concat(originalValue, ".", i), aboutToOverflow.Value);
+                Assert.Equal(string.Concat(originalValue, ".", i.ToString("X")), aboutToOverflow.Value);
             }
 
             // One final increment should cause a reset (.9 -> .10 causes length > 127)
@@ -247,7 +282,7 @@ namespace System.Diagnostics.Tests
             ValidateResetCorrelationVector(
                 preResetValue: incrementedValue,
                 resetVector: aboutToOverflow,
-                expectedExtension: "10");
+                expectedExtension: 16);
 
             // Validate that an additional Increment behaves like normal
             aboutToOverflow.Increment();
@@ -276,7 +311,12 @@ namespace System.Diagnostics.Tests
                 lastDotIndex - spinCharIndex - 1);
             ulong spinElement;
 
-            Assert.True(ulong.TryParse(spinElementString, out spinElement));
+            Assert.True(
+                ulong.TryParse(
+                    spinElementString,
+                    NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture,
+                    out spinElement));
         }
 
         [Fact]
@@ -289,11 +329,14 @@ namespace System.Diagnostics.Tests
             for (int i = 0; i < 100; i++)
             {
                 CorrelationVector spunVector = CorrelationVector.Spin(vector.Value);
-                
+
                 // The cV after a Spin will look like <cvBase>.0_<spinValue>.0, so the spinValue is at index = 2.
                 string spinElement = spunVector.Value.Split('_')[1].Replace(".0", string.Empty);
 
-                ulong spinValue = ulong.Parse(spinElement);
+                ulong spinValue = ulong.Parse(
+                    spinElement,
+                    NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture);
 
                 // Count the number of times the counter wraps.
                 if (spinValue <= lastSpinValue)
@@ -320,13 +363,13 @@ namespace System.Diagnostics.Tests
 
             var correlationVector = CorrelationVector.Spin(originalValue);
 
-            ValidateResetCorrelationVector(originalValue, correlationVector, expectedExtension: "0");
+            ValidateResetCorrelationVector(originalValue, correlationVector, expectedExtension: 0);
         }
 
         private void ValidateResetCorrelationVector(
             string preResetValue,
             CorrelationVector resetVector,
-            string expectedExtension)
+            uint expectedExtension)
         {
             string originalBase = preResetValue.Substring(0, preResetValue.IndexOf('.'));
 
@@ -335,8 +378,13 @@ namespace System.Diagnostics.Tests
 
             Assert.Equal(originalBase, parts[0]);
             Assert.StartsWith(ResetChar, parts[1]);
-            Assert.True(ulong.TryParse(parts[1].Substring(1), out resetElement));
-            Assert.Equal(expectedExtension, parts[2]);
+            Assert.True(
+                ulong.TryParse(
+                    parts[1].Substring(1),
+                    NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture,
+                    out resetElement));
+            Assert.Equal(expectedExtension.ToString("X"), parts[2]);
 
             Assert.Equal(preResetValue, resetVector.PreviousValue);
         }

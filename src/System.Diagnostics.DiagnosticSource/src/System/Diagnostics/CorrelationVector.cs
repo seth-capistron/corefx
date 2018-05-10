@@ -51,7 +51,7 @@ namespace System.Diagnostics
         {
             get
             {
-                return string.Concat(_baseVector, ElementChar, _extension);
+                return string.Concat(_baseVector, ElementChar, _extension.ToString("X"));
             }
         }
 
@@ -76,14 +76,14 @@ namespace System.Diagnostics
                     return Value;
                 }
                 next = snapshot + 1;
-                int size = _baseVector.Length + 1 + (int)Math.Log10(next) + 1;
+                int size = _baseVector.Length + 1 + (int)Math.Log(next, 16) + 1;
                 if (size > CorrelationVector.MaxVectorLength)
                 {
                     // Perform a reset
                     lock (_resetLock)
                     {
                         // Check size again in case another thread did the reset
-                        size = _baseVector.Length + 1 + (int)Math.Log10(next) + 1;
+                        size = _baseVector.Length + 1 + (int)Math.Log(next, 16) + 1;
                         if (size > CorrelationVector.MaxVectorLength)
                         {
                             PreviousValue = Value;
@@ -94,7 +94,7 @@ namespace System.Diagnostics
             }
             while (snapshot != Interlocked.CompareExchange(ref _extension, next, snapshot));
 
-            return string.Concat(_baseVector, ElementChar, next);
+            return string.Concat(_baseVector, ElementChar, next.ToString("X"));
         }
 
         /// <summary>
@@ -156,7 +156,7 @@ namespace System.Diagnostics
 
             // 3 accounts for the "_" before the spin element and the
             // ".0" at the end of the new CorrelationVector
-            int size = correlationVector.Length + 3 + (int)Math.Log10(spinElement) + 1;
+            int size = correlationVector.Length + 3 + (int)Math.Log(spinElement, 16) + 1;
 
             if (size > CorrelationVector.MaxVectorLength)
             {
@@ -170,7 +170,7 @@ namespace System.Diagnostics
 
             return new CorrelationVector()
             {
-                _baseVector = string.Concat(correlationVector, SpinChar, spinElement),
+                _baseVector = string.Concat(correlationVector, SpinChar, spinElement.ToString("X")),
                 _extension = 0
             };
         }
@@ -219,7 +219,11 @@ namespace System.Diagnostics
         {
             string baseVector = GetBaseFromVector(correlationVector);
 
-            return string.Concat(baseVector, ElementChar, ResetChar, GetTimeSortedRandomLong());
+            return string.Concat(
+                baseVector,
+                ElementChar,
+                ResetChar,
+                GetTimeSortedRandomLong().ToString("X"));
         }
     }
 }
