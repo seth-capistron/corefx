@@ -19,6 +19,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'netstandard1.3-Release|AnyCPU'" />
   <ItemGroup>
     <Compile Include="System.Diagnostics.DiagnosticSource.cs" />
+    <Compile Include="System.Diagnostics.DiagnosticSourceActivityOptions.cs" />
     <Compile Include="System.Diagnostics.DiagnosticSourceCorrelationVector.cs" />
     <Compile Include="System.Diagnostics.DiagnosticSourceCorrelationVectorResetResult.cs" />
   </ItemGroup>

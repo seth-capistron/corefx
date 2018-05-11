@@ -159,7 +159,17 @@ namespace System.Diagnostics
         /// call <see cref="Start"/> to build the activity.  You MUST call <see cref="Start"/> before using it.
         /// </summary>
         /// <param name="operationName">Operation's name <see cref="OperationName"/></param>
-        public Activity(string operationName)
+        public Activity(string operationName) :
+            this(operationName, ActivityOptions.DefaultToParent)
+        { }
+
+        /// <summary>
+        /// Note that Activity has a 'builder' pattern, where you call the constructor, a number of 'Set*' and 'Add*' APIs and then
+        /// call <see cref="Start"/> to build the activity.  You MUST call <see cref="Start"/> before using it.
+        /// </summary>
+        /// <param name="operationName">Operation's name <see cref="OperationName"/></param>
+        /// <param name="options">Options to control behavior of this Activity</param>
+        public Activity(string operationName, ActivityOptions options)
         {
             if (string.IsNullOrEmpty(operationName))
             {
@@ -168,6 +178,7 @@ namespace System.Diagnostics
             }
 
             OperationName = operationName;
+            Options = options;
         }
 
         /// <summary>
@@ -194,6 +205,37 @@ namespace System.Diagnostics
         public Activity AddBaggage(string key, string value)
         {
             _baggage = new KeyValueListNode() { keyValue = new KeyValuePair<string, string>(key, value), Next = _baggage };
+            return this;
+        }
+
+        /// <summary>
+        /// Gets the <see cref="CorrelationVector"/> representing this Activity.
+        /// </summary>
+        public CorrelationVector CorrelationVector { get; private set; }
+
+        /// <summary>
+        /// Gets the <see cref="ActivityOptions"/> that control behaviors of this Activity.
+        /// </summary>
+        public ActivityOptions Options { get; private set; }
+
+        /// <summary>
+        /// Updates the Activity to indicate that the activity with the given <paramref name="correlationVector"/>
+        /// caused this activity. This is intended to be used only at 'boundary' scenarios
+        /// where an activity from another process logically started this activity.
+        /// Returns 'this' for convenience chaining.
+        /// </summary>
+        /// <param name="correlationVector"></param>
+        /// <returns></returns>
+        public Activity SetParentCorrelationVector(string correlationVector)
+        {
+            if (string.IsNullOrEmpty(correlationVector))
+            {
+                NotifyError(new ArgumentException($"{nameof(correlationVector)} must not be null or empty"));
+            }
+            else
+            {
+                _parentCorrelationVector = correlationVector;
+            }
             return this;
         }
 
@@ -301,6 +343,11 @@ namespace System.Diagnostics
                     {
                         ParentId = parent.Id;
                         Parent = parent;
+
+                        if (Options == ActivityOptions.DefaultToParent)
+                        {
+                            Options = parent.Options;
+                        }
                     }
                 }
 
@@ -365,6 +412,8 @@ namespace System.Diagnostics
                 // Normal start within the process
                 Debug.Assert(!string.IsNullOrEmpty(Parent.Id));
                 ret = AppendSuffix(Parent.Id, Interlocked.Increment(ref Parent._currentChildId).ToString(), '.');
+                
+                GenerateCorrelationVector(vectorBase: null);
             }
             else if (ParentId != null)
             {
@@ -382,14 +431,42 @@ namespace System.Diagnostics
                 }
 
                 ret = AppendSuffix(parentId, Interlocked.Increment(ref s_currentRootId).ToString("x"), '_');
+
+                GenerateCorrelationVector(vectorBase: null);
             }
             else
             {
                 // A Root Activity (no parent).  
                 ret = GenerateRootId();
+
+                // TODO - tie this to the value used for the Root Id
+                GenerateCorrelationVector(Guid.NewGuid());
             }
             // Useful place to place a conditional breakpoint.  
             return ret;
+        }
+
+        private void GenerateCorrelationVector(Guid? vectorBase)
+        {
+            if (!string.IsNullOrEmpty(_parentCorrelationVector))
+            {
+                this.CorrelationVector = CorrelationVector.Extend(_parentCorrelationVector);
+            }
+            else if (Parent?.CorrelationVector != null)
+            {
+                this.CorrelationVector = CorrelationVector.Extend(Parent.CorrelationVector.Value);
+            }
+            else if (IsOptionSet(ActivityOptions.CreateCorrelationVector))
+            {
+                if (vectorBase != null)
+                {
+                    this.CorrelationVector = new CorrelationVector(vectorBase.Value);
+                }
+                else
+                {
+                    this.CorrelationVector = new CorrelationVector();
+                }
+            }
         }
 
         private string GetRootId(string id)
@@ -436,7 +513,7 @@ namespace System.Diagnostics
             // It is important that the part that changes frequently be first, because
             // many hash functions don't 'randomize' the tail of a string.   This makes
             // sampling based on the hash produce poor samples.
-            return  '|' + Interlocked.Increment(ref s_currentRootId).ToString("x") + s_uniqSuffix;
+            return '|' + Interlocked.Increment(ref s_currentRootId).ToString("x") + s_uniqSuffix;
         }
 #if ALLOW_PARTIALLY_TRUSTED_CALLERS
         [SecuritySafeCritical]
@@ -459,8 +536,14 @@ namespace System.Diagnostics
             return canSet;
         }
 
+        private bool IsOptionSet(ActivityOptions option)
+        {
+            return (Options & option) != ActivityOptions.DefaultToParent;
+        }
+
         private string _rootId;
         private int _currentChildId;  // A unique number for all children of this activity.  
+        private string _parentCorrelationVector;
 
         // Used to generate an ID it represents the machine and process we are in.  
         private static readonly string s_uniqSuffix = "-" + GetRandomNumber().ToString("x") + ".";

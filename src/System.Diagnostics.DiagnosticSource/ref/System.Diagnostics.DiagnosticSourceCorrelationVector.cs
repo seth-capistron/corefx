@@ -10,6 +10,7 @@ namespace System.Diagnostics
     public partial class CorrelationVector
     {
         public CorrelationVector() { }
+        public CorrelationVector(Guid vectorBase) { }
         public CorrelationVectorResetResult ResetResult { get { throw null; } }
         public string Value { get { throw null; } }
         public bool Equals(CorrelationVector correlationVector) { throw null; }

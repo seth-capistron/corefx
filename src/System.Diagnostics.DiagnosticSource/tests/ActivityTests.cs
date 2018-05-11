@@ -477,6 +477,125 @@ namespace System.Diagnostics.Tests
         }
 
         /// <summary>
+        /// Tests activity SetParentCorrelationVector method
+        /// </summary>
+        [Fact]
+        public void SetParentCorrelationVector()
+        {
+            var parent = new Activity("parent", ActivityOptions.CreateCorrelationVector);
+
+            parent.SetParentCorrelationVector(null);  // Error does nothing
+            Assert.Null(parent.CorrelationVector);
+
+            parent.SetParentCorrelationVector("");  // Error does nothing
+            Assert.Null(parent.CorrelationVector);
+
+            var correlationVector = new CorrelationVector();
+
+            parent.SetParentCorrelationVector(correlationVector.ToString());
+            Assert.Null(parent.CorrelationVector);
+
+            parent.Start();
+
+            Assert.NotNull(parent.CorrelationVector);
+            Assert.Equal(
+                string.Concat(correlationVector.ToString(), ".0"),
+                parent.CorrelationVector.ToString());
+        }
+
+        /// <summary>
+        /// Tests the three methods for setting a Correlation Vector on an Activity.
+        /// </summary>
+        [Fact]
+        public void CorrelationVectorCreationMethods()
+        {
+            // There are 3 ways for an Activity to get a Correlation Vector (in precendence order)...
+            // 1. Explicitly call .SetParentCorrelationVector
+            // 2. Have a parent Activity who has a CorrelationVector
+            // 3. Specify 'CreateCorrelationVector' when creating the Activity
+
+            // Create an Activity to validate condition 1
+            var correlationVector = new CorrelationVector();
+
+            var parent = new Activity("activity")
+                .SetParentId("1")
+                .SetParentCorrelationVector(correlationVector.Value)
+                .Start();
+
+            Assert.NotNull(parent.CorrelationVector);
+            Assert.Equal(correlationVector.Value + ".0", parent.CorrelationVector.Value);
+
+            // Create Activities to validate condition 2
+            var child = new Activity("child")
+                .Start();
+
+            Assert.NotNull(child.CorrelationVector);
+            Assert.Equal(parent.CorrelationVector.Value + ".0", child.CorrelationVector.Value);
+
+            child.Stop();
+            parent.Stop();
+
+            // Create an Activity to validate condition 3
+            var activityWithCorrelationVector = new Activity("activity", ActivityOptions.CreateCorrelationVector)
+                .SetParentId("1")
+                .Start();
+
+            Assert.NotNull(activityWithCorrelationVector.CorrelationVector);
+
+            activityWithCorrelationVector.Stop();
+
+            // Create an Activity without any of the conditions
+            var activityWithoutCorrelationVector = new Activity("activity", ActivityOptions.CreateCorrelationVector)
+                .SetParentId("1")
+                .Start();
+
+            Assert.NotNull(activityWithoutCorrelationVector.CorrelationVector);
+
+            activityWithoutCorrelationVector.Stop();
+        }
+
+        /// <summary>
+        /// Tests the precendence amongst the three methods for setting a Correlation
+        /// Vector on an Activity.
+        /// </summary>
+        [Fact]
+        public void CorrelationVectorCreationMethodsPrecedence()
+        {
+            // There are 3 ways for an Activity to get a Correlation Vector (in precendence order)...
+            // 1. Explicitly call .SetParentCorrelationVector
+            // 2. Have a parent Activity who has a CorrelationVector
+            // 3. Specify 'CreateCorrelationVector' when creating the Activity
+
+            // Create an Activity with conditions 1, 2, and 3... ensure 1 has precendence
+            var correlationVector = new CorrelationVector();
+
+            var parent = new Activity("parent", ActivityOptions.CreateCorrelationVector)
+                .SetParentId("1")
+                .Start();
+
+            // This validates condition 3
+            Assert.NotNull(parent.CorrelationVector);
+
+            var child = new Activity("child", ActivityOptions.CreateCorrelationVector)
+                .SetParentCorrelationVector(correlationVector.Value)
+                .Start();
+
+            Assert.NotNull(child.CorrelationVector);
+            Assert.Equal(correlationVector.Value + ".0", child.CorrelationVector.Value);
+
+            child.Stop();
+
+            // Create an Activity with conditions 2 and 3... ensure 2 has precedence
+            child = new Activity("child", ActivityOptions.CreateCorrelationVector)
+                .Start();
+
+            Assert.NotNull(child.CorrelationVector);
+            Assert.Equal(parent.CorrelationVector + ".0", child.CorrelationVector.Value);
+
+            child.Stop();
+        }
+
+        /// <summary>
         /// Tests that Activity.Current flows correctly within async methods
         /// </summary>
         [Fact]

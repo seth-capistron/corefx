@@ -29,9 +29,17 @@ namespace System.Diagnostics
         /// <summary>
         /// Initializes a new instance of the <see cref="CorrelationVector"/> class.
         /// </summary>
-        public CorrelationVector()
+        public CorrelationVector() :
+            this(Guid.NewGuid())
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CorrelationVector"/> class.
+        /// </summary>
+        /// <param name="vectorBase">Value to encode to create the <see cref="CorrelationVector"/> Base.</param>
+        public CorrelationVector(Guid vectorBase)
         {
-            string generatedCharacters = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+            string generatedCharacters = Convert.ToBase64String(vectorBase.ToByteArray());
 
             _baseVector = string.Concat(
                 generatedCharacters.Substring(0, CorrelationVector.BaseLength - 1),
@@ -96,7 +104,7 @@ namespace System.Diagnostics
                                 BaseVector = previousVectorBase,
                                 ResetExtension = resetExtension
                             };
-                            
+
                         }
                     }
                 }
