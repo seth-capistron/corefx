@@ -412,8 +412,8 @@ namespace System.Diagnostics
                 // Normal start within the process
                 Debug.Assert(!string.IsNullOrEmpty(Parent.Id));
                 ret = AppendSuffix(Parent.Id, Interlocked.Increment(ref Parent._currentChildId).ToString(), '.');
-                
-                GenerateCorrelationVector(vectorBase: null);
+
+                GenerateCorrelationVector();
             }
             else if (ParentId != null)
             {
@@ -432,21 +432,20 @@ namespace System.Diagnostics
 
                 ret = AppendSuffix(parentId, Interlocked.Increment(ref s_currentRootId).ToString("x"), '_');
 
-                GenerateCorrelationVector(vectorBase: null);
+                GenerateCorrelationVector();
             }
             else
             {
-                // A Root Activity (no parent).  
-                ret = GenerateRootId();
-
-                // TODO - tie this to the value used for the Root Id
-                GenerateCorrelationVector(Guid.NewGuid());
+                // A Root Activity (no parent). If a new Correlation Vector is generated, then use 
+                // the same base to create the root Activity Id.
+                Guid? vectorBase = GenerateCorrelationVector();
+                ret = GenerateRootId(vectorBase?.ToByteArray());
             }
             // Useful place to place a conditional breakpoint.  
             return ret;
         }
 
-        private void GenerateCorrelationVector(Guid? vectorBase)
+        private Guid? GenerateCorrelationVector()
         {
             if (!string.IsNullOrEmpty(_parentCorrelationVector))
             {
@@ -458,15 +457,14 @@ namespace System.Diagnostics
             }
             else if (IsOptionSet(ActivityOptions.CreateCorrelationVector))
             {
-                if (vectorBase != null)
-                {
-                    this.CorrelationVector = new CorrelationVector(vectorBase.Value);
-                }
-                else
-                {
-                    this.CorrelationVector = new CorrelationVector();
-                }
+                Guid vectorBase = Guid.NewGuid();
+
+                this.CorrelationVector = new CorrelationVector(vectorBase);
+
+                return vectorBase;
             }
+
+            return null;
         }
 
         private string GetRootId(string id)
@@ -508,13 +506,32 @@ namespace System.Diagnostics
             return parentId.Substring(0, trimPosition) + overflowSuffix + '#';
         }
 
-        private string GenerateRootId()
+        private string GenerateRootId(byte[] idBytes = null)
         {
-            // It is important that the part that changes frequently be first, because
-            // many hash functions don't 'randomize' the tail of a string.   This makes
-            // sampling based on the hash produce poor samples.
-            return '|' + Interlocked.Increment(ref s_currentRootId).ToString("x") + s_uniqSuffix;
+            if (idBytes == null)
+            {
+                idBytes = new byte[16];
+
+                // It is important that the part that changes frequently be first, because
+                // many hash functions don't 'randomize' the tail of a string. This makes
+                // sampling based on the hash produce poor samples.
+
+                byte[] baseIdBytes = BitConverter.GetBytes(Interlocked.Increment(ref s_currentRootId));
+                byte[] suffixBytes = BitConverter.GetBytes(s_uniqSuffix);
+
+                Buffer.BlockCopy(baseIdBytes, 0, idBytes, 0, 8);
+                Buffer.BlockCopy(suffixBytes, 0, idBytes, 8, 8);
+            }
+
+            Debug.Assert(idBytes.Length == 16);
+
+            return '|' +
+                BitConverter.ToUInt64(idBytes, 0).ToString("x") +
+                "-" +
+                BitConverter.ToUInt64(idBytes, 8).ToString("x") +
+                ".";
         }
+
 #if ALLOW_PARTIALLY_TRUSTED_CALLERS
         [SecuritySafeCritical]
 #endif
@@ -546,7 +563,7 @@ namespace System.Diagnostics
         private string _parentCorrelationVector;
 
         // Used to generate an ID it represents the machine and process we are in.  
-        private static readonly string s_uniqSuffix = "-" + GetRandomNumber().ToString("x") + ".";
+        private static readonly long s_uniqSuffix = GetRandomNumber();
 
         //A unique number inside the appdomain, randomized between appdomains. 
         //Int gives enough randomization and keeps hex-encoded s_currentRootId 8 chars long for most applications

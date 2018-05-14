@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -474,6 +475,50 @@ namespace System.Diagnostics.Tests
                     Assert.InRange(observer.Activity.Duration, TimeSpan.FromTicks(1), stopWatch.Elapsed.Add(TimeSpan.FromMilliseconds(2 * MaxClockErrorMSec)));
                 } 
             }
+        }
+
+        /// <summary>
+        /// Tests that when a new Root Activity Id and Correlation Vector are generated,
+        /// they are both based on the same bytes (but they will be encoded differently)
+        /// </summary>
+        [Fact]
+        public void ActivityIdAndCorrelationVectorBasedOnSameValue()
+        {
+            var parent = new Activity("parent", ActivityOptions.CreateCorrelationVector).Start();
+
+            string[] activityIdParts = parent.Id.Split('-');
+            byte[] activityIdBytes = new byte[16];
+
+            Assert.Equal(2, activityIdParts.Length);
+
+            byte[] baseIdBytes = BitConverter.GetBytes(
+                long.Parse(
+                    activityIdParts[0].Substring(1),
+                    NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture));
+
+            byte[] suffixBytes = BitConverter.GetBytes(
+                long.Parse(
+                    activityIdParts[1].Substring(0, activityIdParts[1].Length - 1),
+                    NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture));
+
+            Buffer.BlockCopy(baseIdBytes, 0, activityIdBytes, 0, 8);
+            Buffer.BlockCopy(suffixBytes, 0, activityIdBytes, 8, 8);
+
+            string[] correlationVectorParts = parent.CorrelationVector.Value.Split('.');
+
+            Assert.Equal(2, correlationVectorParts.Length);
+
+            // Ignore the last character of the Correlation Vector Base, which indicates the cV version
+            // and add back "==" at the end to make it a valid Base64 string
+            byte[] correlationVectorBytes = Convert.FromBase64String(
+                correlationVectorParts[0].Substring(0, correlationVectorParts[0].Length - 1) + "==");
+
+            Guid activityIdGuid = new Guid(activityIdBytes);
+            Guid correlationVectorGuid = new Guid(correlationVectorBytes);
+
+            Assert.Equal(activityIdGuid.ToString(), correlationVectorGuid.ToString());
         }
 
         /// <summary>
