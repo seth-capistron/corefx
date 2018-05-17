@@ -317,7 +317,10 @@ namespace System.Net.Http.Functional.Tests
                 bool activityStopLogged = false;
                 bool exceptionLogged = false;
 
-                Activity parentActivity = new Activity("parent");
+                Activity parentActivity = new Activity(
+                    "parent",
+                    ActivityOptions.CreateCorrelationVector | ActivityOptions.PropagateCorrelationVector);
+
                 parentActivity.AddBaggage("correlationId", Guid.NewGuid().ToString());
                 parentActivity.AddBaggage("moreBaggage", Guid.NewGuid().ToString());
                 parentActivity.AddTag("tag", "tag"); //add tag to ensure it is not injected into request
@@ -720,6 +723,7 @@ namespace System.Net.Http.Functional.Tests
         private static void AssertHeadersAreInjected(List<string> requestLines, Activity parent)
         {
             string requestId = null;
+            string correlationVector = null;
             var correlationContext = new List<NameValueHeaderValue>();
 
             foreach (var line in requestLines)
@@ -727,6 +731,10 @@ namespace System.Net.Http.Functional.Tests
                 if (line.StartsWith("Request-Id"))
                 {
                     requestId = line.Substring("Request-Id".Length).Trim(' ', ':');
+                }
+                if (line.StartsWith("MS-CV"))
+                {
+                    correlationVector = line.Substring("MS-CV".Length).Trim(' ', ':');
                 }
                 if (line.StartsWith("Correlation-Context"))
                 {
@@ -740,6 +748,17 @@ namespace System.Net.Http.Functional.Tests
             Assert.True(requestId != null, "Request-Id was not injected when instrumentation was enabled");
             Assert.True(requestId.StartsWith(parent.Id));
             Assert.NotEqual(parent.Id, requestId);
+
+            if (parent.CorrelationVector != null &&
+                (parent.Options | ActivityOptions.PropagateCorrelationVector) != ActivityOptions.None)
+            {
+                Assert.True(correlationVector != null, "MS-CV was not injected");
+                Assert.Equal(parent.CorrelationVector.Value, correlationVector);
+            }
+            else
+            {
+                Assert.True(correlationVector == null, "MS-CV was injected");
+            }
 
             List<KeyValuePair<string, string>> baggage = parent.Baggage.ToList();
             Assert.Equal(baggage.Count, correlationContext.Count);

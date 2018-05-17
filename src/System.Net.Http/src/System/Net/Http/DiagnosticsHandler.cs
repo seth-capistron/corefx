@@ -75,6 +75,15 @@ namespace System.Net.Http
             if (currentActivity != null)
             {
                 request.Headers.Add(DiagnosticsHandlerLoggingStrings.RequestIdHeaderName, currentActivity.Id);
+
+                if (currentActivity.CorrelationVector != null &&
+                    (activity.Options | ActivityOptions.PropagateCorrelationVector) != ActivityOptions.None)
+                {
+                    request.Headers.Add(
+                        DiagnosticsHandlerLoggingStrings.CorrelationVectorHeaderName,
+                        currentActivity.CorrelationVector.Increment());
+                }
+
                 //we expect baggage to be empty or contain a few items
                 using (IEnumerator<KeyValuePair<string, string>> e = currentActivity.Baggage.GetEnumerator())
                 {

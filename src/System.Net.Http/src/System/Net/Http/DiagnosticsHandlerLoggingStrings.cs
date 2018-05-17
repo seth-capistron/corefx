@@ -19,5 +19,6 @@ namespace System.Net.Http
 
         public const string RequestIdHeaderName = "Request-Id";
         public const string CorrelationContextHeaderName = "Correlation-Context";
+        public const string CorrelationVectorHeaderName = "MS-CV";
     }
 }

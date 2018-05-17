@@ -24,6 +24,7 @@ namespace System.Diagnostics {
     public Activity AddTag(string key, string value) {throw null;}
     public Activity AddBaggage(string key, string value) {throw null;}
     public Activity SetParentCorrelationVector(string correlationVector) { throw null; }
+    public Activity SetParentCorrelationVector(string correlationVector, bool isForkedFromParent) { throw null; }
     public Activity SetParentId(string parentId) {throw null;}
     public Activity SetStartTime(DateTime startTimeUtc) {throw null;}
     public Activity SetEndTime(DateTime endTimeUtc) {throw null;}

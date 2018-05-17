@@ -228,6 +228,20 @@ namespace System.Diagnostics
         /// <returns></returns>
         public Activity SetParentCorrelationVector(string correlationVector)
         {
+            return SetParentCorrelationVector(correlationVector, isForkedFromParent: false);
+        }
+
+        /// <summary>
+        /// Updates the Activity to indicate that the activity with the given <paramref name="correlationVector"/>
+        /// caused this activity. This is intended to be used only at 'boundary' scenarios
+        /// where an activity from another process logically started this activity.
+        /// Returns 'this' for convenience chaining.
+        /// </summary>
+        /// <param name="correlationVector"></param>
+        /// <param name="isForkedFromParent"></param>
+        /// <returns></returns>
+        public Activity SetParentCorrelationVector(string correlationVector, bool isForkedFromParent)
+        {
             if (string.IsNullOrEmpty(correlationVector))
             {
                 NotifyError(new ArgumentException($"{nameof(correlationVector)} must not be null or empty"));
@@ -235,6 +249,7 @@ namespace System.Diagnostics
             else
             {
                 _parentCorrelationVector = correlationVector;
+                _isForkedFromParentCorrelationVector = isForkedFromParent;
             }
             return this;
         }
@@ -449,11 +464,18 @@ namespace System.Diagnostics
         {
             if (!string.IsNullOrEmpty(_parentCorrelationVector))
             {
-                this.CorrelationVector = CorrelationVector.Extend(_parentCorrelationVector);
+                if (_isForkedFromParentCorrelationVector)
+                {
+                    this.CorrelationVector = CorrelationVector.Spin(_parentCorrelationVector);
+                }
+                else
+                {
+                    this.CorrelationVector = CorrelationVector.Extend(_parentCorrelationVector);
+                }
             }
             else if (Parent?.CorrelationVector != null)
             {
-                this.CorrelationVector = CorrelationVector.Extend(Parent.CorrelationVector.Value);
+                this.CorrelationVector = CorrelationVector.Extend(Parent.CorrelationVector.Increment());
             }
             else if (IsOptionSet(ActivityOptions.CreateCorrelationVector))
             {
@@ -555,12 +577,13 @@ namespace System.Diagnostics
 
         private bool IsOptionSet(ActivityOptions option)
         {
-            return (Options & option) != ActivityOptions.DefaultToParent;
+            return (Options & option) != ActivityOptions.None;
         }
 
         private string _rootId;
         private int _currentChildId;  // A unique number for all children of this activity.  
         private string _parentCorrelationVector;
+        private bool _isForkedFromParentCorrelationVector;
 
         // Used to generate an ID it represents the machine and process we are in.  
         private static readonly long s_uniqSuffix = GetRandomNumber();

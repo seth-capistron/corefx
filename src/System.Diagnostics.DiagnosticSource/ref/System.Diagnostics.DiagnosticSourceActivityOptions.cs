@@ -9,8 +9,9 @@ namespace System.Diagnostics
 {
     public enum ActivityOptions
     {
-        DefaultToParent = 0,
-        CreateCorrelationVector = 1,
-        PropagateCorrelationVector = 2
+        None = 0,
+        DefaultToParent = 1,
+        CreateCorrelationVector = 2,
+        PropagateCorrelationVector = 4
     }
 }

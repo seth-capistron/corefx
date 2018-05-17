@@ -11,19 +11,24 @@ namespace System.Diagnostics
     public enum ActivityOptions
     {
         /// <summary>
+        /// Use all default options.
+        /// </summary>
+        None = 0,
+
+        /// <summary>
         /// Default to the behavior of the Parent <see cref="Activity"/>.
         /// </summary>
-        DefaultToParent = 0,
+        DefaultToParent = 1,
         
         /// <summary>
         /// Create a <see cref="CorrelationVector"/> if Parent <see cref="Activity"/> does not
         /// have one defined and SetParentCorrelationVector was not called.
         /// </summary>
-        CreateCorrelationVector = 1,
+        CreateCorrelationVector = 2,
 
         /// <summary>
         /// Propagate the <see cref="CorrelationVector"/> value along (like in HttpClient).
         /// </summary>
-        PropagateCorrelationVector = 2
+        PropagateCorrelationVector = 4
     }
 }

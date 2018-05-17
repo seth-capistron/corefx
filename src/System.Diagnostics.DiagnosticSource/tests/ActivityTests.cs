@@ -590,11 +590,11 @@ namespace System.Diagnostics.Tests
             activityWithCorrelationVector.Stop();
 
             // Create an Activity without any of the conditions
-            var activityWithoutCorrelationVector = new Activity("activity", ActivityOptions.CreateCorrelationVector)
+            var activityWithoutCorrelationVector = new Activity("activity")
                 .SetParentId("1")
                 .Start();
 
-            Assert.NotNull(activityWithoutCorrelationVector.CorrelationVector);
+            Assert.Null(activityWithoutCorrelationVector.CorrelationVector);
 
             activityWithoutCorrelationVector.Stop();
         }
@@ -631,11 +631,15 @@ namespace System.Diagnostics.Tests
             child.Stop();
 
             // Create an Activity with conditions 2 and 3... ensure 2 has precedence
+            string parentCorrelationVectorPreviousValue = parent.CorrelationVector.Value;
             child = new Activity("child", ActivityOptions.CreateCorrelationVector)
                 .Start();
 
             Assert.NotNull(child.CorrelationVector);
-            Assert.Equal(parent.CorrelationVector + ".0", child.CorrelationVector.Value);
+            Assert.Equal(
+                parentCorrelationVectorPreviousValue.Replace(".0", ".1"),
+                parent.CorrelationVector.Value);
+            Assert.Equal(parent.CorrelationVector.Value + ".0", child.CorrelationVector.Value);
 
             child.Stop();
         }
