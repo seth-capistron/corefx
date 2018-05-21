@@ -17,6 +17,8 @@ namespace System.Net.Http
     {
         private readonly WinHttpHandler _winHttpHandler;
         private readonly SocketsHttpHandler _socketsHttpHandler;
+        private readonly CorrelationPropagationHandler _winHttpCorrelationHandler;
+        private readonly CorrelationPropagationHandler _socketsCorrelationHandler;
         private readonly DiagnosticsHandler _diagnosticsHandler;
         private bool _useProxy;
         private ClientCertificateOption _clientCertificateOptions;
@@ -28,14 +30,16 @@ namespace System.Net.Http
             if (useSocketsHttpHandler)
             {
                 _socketsHttpHandler = new SocketsHttpHandler();
-                _diagnosticsHandler = new DiagnosticsHandler(_socketsHttpHandler);
+                _socketsCorrelationHandler = new CorrelationPropagationHandler(_socketsHttpHandler);
+                _diagnosticsHandler = new DiagnosticsHandler(new CorrelationPropagationHandler(_socketsHttpHandler));
                 ClientCertificateOptions = ClientCertificateOption.Manual;
 
             }
             else
             {
                 _winHttpHandler = new WinHttpHandler();
-                _diagnosticsHandler = new DiagnosticsHandler(_winHttpHandler);
+                _winHttpCorrelationHandler = new CorrelationPropagationHandler(_winHttpHandler);
+                _diagnosticsHandler = new DiagnosticsHandler(new CorrelationPropagationHandler(_winHttpHandler));
 
                 // Adjust defaults to match current .NET Desktop HttpClientHandler (based on HWR stack).
                 AllowAutoRedirect = true;
@@ -478,13 +482,13 @@ namespace System.Net.Http
 
                 return DiagnosticsHandler.IsEnabled() ?
                     _diagnosticsHandler.SendAsync(request, cancellationToken) :
-                    _winHttpHandler.SendAsync(request, cancellationToken);
+                    _winHttpCorrelationHandler.SendAsync(request, cancellationToken);
             }
             else
             {
                 return DiagnosticsHandler.IsEnabled() ?
                     _diagnosticsHandler.SendAsync(request, cancellationToken) :
-                    _socketsHttpHandler.SendAsync(request, cancellationToken);
+                    _socketsCorrelationHandler.SendAsync(request, cancellationToken);
             }
         }
     }

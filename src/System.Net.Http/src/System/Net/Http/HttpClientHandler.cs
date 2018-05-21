@@ -2,7 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System.Diagnostics;
+using System.Collections.Generic;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 
@@ -13,6 +13,9 @@ namespace System.Net.Http
         // This partial implementation contains members common to all HttpClientHandler implementations.
         private const string SocketsHttpHandlerEnvironmentVariableSettingName = "DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER";
         private const string SocketsHttpHandlerAppCtxSettingName = "System.Net.Http.UseSocketsHttpHandler";
+
+        internal static List<Action<HttpRequestMessage>> s_CorrelationPropagationDelegates =
+            new List<Action<HttpRequestMessage>>();
 
         private static bool UseSocketsHttpHandler
         {
@@ -36,7 +39,15 @@ namespace System.Net.Http
                 return true;
             }
         }
-
+        
         public static Func<HttpRequestMessage, X509Certificate2, X509Chain, SslPolicyErrors, bool> DangerousAcceptAnyServerCertificateValidator { get; } = delegate { return true; };
+
+        public static void RegisterCorrelationPropagationDelegate(Action<HttpRequestMessage> propagationDelegate)
+        {
+            if (propagationDelegate != null)
+            {
+                s_CorrelationPropagationDelegates.Add(propagationDelegate);
+            }
+        }
     }
 }

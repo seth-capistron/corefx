@@ -36,6 +36,23 @@ namespace System.Diagnostics
         /// the name but rather in the tags.  
         /// </summary>
         public string OperationName { get; }
+        
+        private static HashSet<Type> s_ExtensibleActivityTypes = new HashSet<Type>();
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        public static void RegisterExtensibleActivityType<T>() where T : ExtensibleActivity
+        {
+            lock (s_ExtensibleActivityTypes)
+            {
+                if (!s_ExtensibleActivityTypes.Contains(typeof(T)))
+                {
+                    s_ExtensibleActivityTypes.Add(typeof(T));
+                }
+            }
+        }
 
         /// <summary>
         /// This is an ID that is specific to a particular request.   Filtering
@@ -152,6 +169,35 @@ namespace System.Diagnostics
             return null;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        public IEnumerable<ExtensibleActivity> ExtensibleActivities
+        {
+            get
+            {
+                foreach( var extensibleActivity in _extensibleActivities.Values)
+                {
+                    yield return extensibleActivity;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public T GetExtensibleActivity<T>() where T : ExtensibleActivity
+        {
+            if (_extensibleActivities.ContainsKey(typeof(T)))
+            {
+                return _extensibleActivities[typeof(T)] as T;
+            }
+
+            return null;
+        }
+
         /* Constructors  Builder methods */
 
         /// <summary>
@@ -168,6 +214,15 @@ namespace System.Diagnostics
             }
 
             OperationName = operationName;
+
+            foreach (Type extensibleActivityType in s_ExtensibleActivityTypes)
+            {
+                Debug.Assert(extensibleActivityType.IsSubclassOf(typeof(ExtensibleActivity)));
+
+                _extensibleActivities.Add(
+                    extensibleActivityType,
+                    Activator.CreateInstance(extensibleActivityType, this) as ExtensibleActivity);
+            }
         }
 
         /// <summary>
@@ -311,7 +366,13 @@ namespace System.Diagnostics
 
                 Id = GenerateId();
                 SetCurrent(this);
+
+                ForEachExtensibleActivity((extensibleActivity) =>
+                {
+                    extensibleActivity.ActivityStarted();
+                });
             }
+
             return this;
         }
 
@@ -340,6 +401,11 @@ namespace System.Diagnostics
                 }
 
                 SetCurrent(Parent);
+
+                ForEachExtensibleActivity((extensibleActivity) =>
+                {
+                    extensibleActivity.ActivityStopped();
+                });
             }
         }
 
@@ -436,7 +502,7 @@ namespace System.Diagnostics
             // It is important that the part that changes frequently be first, because
             // many hash functions don't 'randomize' the tail of a string.   This makes
             // sampling based on the hash produce poor samples.
-            return  '|' + Interlocked.Increment(ref s_currentRootId).ToString("x") + s_uniqSuffix;
+            return '|' + Interlocked.Increment(ref s_currentRootId).ToString("x") + s_uniqSuffix;
         }
 #if ALLOW_PARTIALLY_TRUSTED_CALLERS
         [SecuritySafeCritical]
@@ -459,6 +525,19 @@ namespace System.Diagnostics
             return canSet;
         }
 
+        private void ForEachExtensibleActivity(Action<ExtensibleActivity> action)
+        {
+            foreach (var activity in _extensibleActivities.Values)
+            {
+                var extensibleActivity = activity as ExtensibleActivity;
+
+                if (extensibleActivity != null)
+                {
+                    action(extensibleActivity);
+                }
+            }
+        }
+
         private string _rootId;
         private int _currentChildId;  // A unique number for all children of this activity.  
 
@@ -470,6 +549,9 @@ namespace System.Diagnostics
         private static long s_currentRootId = (uint)GetRandomNumber();
 
         private const int RequestIdMaxLength = 1024;
+
+        private Dictionary<Type, ExtensibleActivity> _extensibleActivities =
+            new Dictionary<Type, ExtensibleActivity>();
 
         /// <summary>
         /// Having our own key-value linked list allows us to be more efficient  

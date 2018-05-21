@@ -107,6 +107,7 @@ namespace System.Net.Http
         public bool UseDefaultCredentials { get { throw null; } set { } }
         public bool UseProxy { get { throw null; } set { } }
         protected override void Dispose(bool disposing) { }
+        public static void RegisterCorrelationPropagationDelegate(Action<HttpRequestMessage> propagationDelegate) { }
         protected internal override System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
     public enum HttpCompletionOption

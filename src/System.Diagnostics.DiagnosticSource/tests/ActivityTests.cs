@@ -31,6 +31,74 @@ namespace System.Diagnostics.Tests
             Assert.Equal(0, activity.Tags.ToList().Count);
         }
 
+        [Fact]
+        public void ExtensibleActivity()
+        {
+            Activity.RegisterExtensibleActivityType<MyExtensibleActivity>();
+
+            var parent = new Activity("parent");
+            MyExtensibleActivity parentExtensibleActivity = parent.GetExtensibleActivity<MyExtensibleActivity>();
+
+            Assert.NotNull(parentExtensibleActivity);
+            Assert.False(parentExtensibleActivity.ActivityStartedCalled);
+            Assert.False(parentExtensibleActivity.ActivityStoppedCalled);
+            Assert.False(parentExtensibleActivity.SetExternalParentCalled);
+            Assert.Null(parentExtensibleActivity.ExternalParentId);
+            Assert.Equal(parent, parentExtensibleActivity.ExposedActivity);
+
+            parent.Start();
+
+            Assert.True(parentExtensibleActivity.ActivityStartedCalled);
+
+            var child = new Activity("child").Start();
+            MyExtensibleActivity childExtensibleActivity = child.GetExtensibleActivity<MyExtensibleActivity>();
+
+            Assert.NotNull(childExtensibleActivity);
+            Assert.Equal(parent, childExtensibleActivity.ExposedActivity.Parent);
+
+            child.Stop();
+
+            Assert.True(childExtensibleActivity.ActivityStoppedCalled);
+        }
+
+        internal class MyExtensibleActivity : ExtensibleActivity
+        {
+            internal bool ActivityStartedCalled { get; private set; }
+
+            internal bool ActivityStoppedCalled { get; private set; }
+
+            internal string ExternalParentId { get; private set; }
+
+            internal bool SetExternalParentCalled { get; private set; }
+
+            internal Activity ExposedActivity
+            {
+                get
+                {
+                    return Activity;
+                }
+            }
+
+            public MyExtensibleActivity(Activity activity) : base(activity)
+            { }
+
+            public override void ActivityStarted()
+            {
+                ActivityStartedCalled = true;
+            }
+
+            public override void ActivityStopped()
+            {
+                ActivityStoppedCalled = true;
+            }
+
+            public override void SetExternalParentId(string parentId)
+            {
+                ExternalParentId = parentId;
+                SetExternalParentCalled = true;
+            }
+        }
+
         /// <summary>
         /// Tests baggage operations
         /// </summary>

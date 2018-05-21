@@ -38,6 +38,7 @@
     <Compile Include="System\Diagnostics\DiagnosticSource.cs" />
     <Compile Include="System\Diagnostics\DiagnosticListener.cs" />
     <Compile Include="System\Diagnostics\DiagnosticSourceEventSource.cs" />
+    <Compile Include="System\Diagnostics\ExtensibleActivity.cs" />
     <None Include="DiagnosticSourceUsersGuide.md" />
   </ItemGroup>
   <ItemGroup Condition=" '$(TargetGroup)' != 'netstandard1.1'">
