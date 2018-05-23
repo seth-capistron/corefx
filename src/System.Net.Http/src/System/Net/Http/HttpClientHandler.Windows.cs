@@ -20,8 +20,10 @@ namespace System.Net.Http
         private readonly CorrelationPropagationHandler _winHttpCorrelationHandler;
         private readonly CorrelationPropagationHandler _socketsCorrelationHandler;
         private readonly DiagnosticsHandler _diagnosticsHandler;
+        private readonly CorrelationPropagationHandler _diagnosticsCorrelationHandler;
         private bool _useProxy;
         private ClientCertificateOption _clientCertificateOptions;
+        //private Action<HttpRequestMessage> _correlationPropagationDelegate;
 
         public HttpClientHandler() : this(UseSocketsHttpHandler) { }
 
@@ -31,7 +33,8 @@ namespace System.Net.Http
             {
                 _socketsHttpHandler = new SocketsHttpHandler();
                 _socketsCorrelationHandler = new CorrelationPropagationHandler(_socketsHttpHandler);
-                _diagnosticsHandler = new DiagnosticsHandler(new CorrelationPropagationHandler(_socketsHttpHandler));
+                _diagnosticsCorrelationHandler = new CorrelationPropagationHandler(_socketsHttpHandler);
+                _diagnosticsHandler = new DiagnosticsHandler(_diagnosticsCorrelationHandler);
                 ClientCertificateOptions = ClientCertificateOption.Manual;
 
             }
@@ -39,7 +42,8 @@ namespace System.Net.Http
             {
                 _winHttpHandler = new WinHttpHandler();
                 _winHttpCorrelationHandler = new CorrelationPropagationHandler(_winHttpHandler);
-                _diagnosticsHandler = new DiagnosticsHandler(new CorrelationPropagationHandler(_winHttpHandler));
+                _diagnosticsCorrelationHandler = new CorrelationPropagationHandler(_winHttpHandler);
+                _diagnosticsHandler = new DiagnosticsHandler(_diagnosticsCorrelationHandler);
 
                 // Adjust defaults to match current .NET Desktop HttpClientHandler (based on HWR stack).
                 AllowAutoRedirect = true;
@@ -441,6 +445,31 @@ namespace System.Net.Http
                 }
             }
         }
+
+        //public Action<HttpRequestMessage> CorrelationPropagationDelegate
+        //{
+        //    get
+        //    {
+        //        return _correlationPropagationDelegate;
+        //    }
+        //    set
+        //    {
+        //        _correlationPropagationDelegate = value;
+
+        //        if (_winHttpCorrelationHandler != null)
+        //        {
+        //            _winHttpCorrelationHandler.PropagationDelegateOverride = value;
+        //        }
+        //        if (_socketsCorrelationHandler != null)
+        //        {
+        //            _socketsCorrelationHandler.PropagationDelegateOverride = value;
+        //        }
+        //        if (_diagnosticsCorrelationHandler != null)
+        //        {
+        //            _diagnosticsCorrelationHandler.PropagationDelegateOverride = value;
+        //        }
+        //    }
+        //}
 
         public IDictionary<string, object> Properties => _winHttpHandler != null ?
             _winHttpHandler.Properties :

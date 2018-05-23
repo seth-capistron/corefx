@@ -5,15 +5,8 @@
 // Changes to this file must follow the http://aka.ms/api-review process.
 // ------------------------------------------------------------------------------
 
-using System.Collections.Generic;
-
-namespace System.Diagnostics
-{
-    public abstract partial class ExtensibleActivity
-    {
-        public ExtensibleActivity(Activity activity) { }
-        protected Activity Activity { get; private set; }
-        public abstract void SetExternalParentId(string parentId);
+namespace System.Diagnostics {
+    public abstract partial class ActivityExtension {
         public abstract void ActivityStarted();
         public abstract void ActivityStopped();
     }

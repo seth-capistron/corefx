@@ -14,8 +14,8 @@ namespace System.Net.Http
         private const string SocketsHttpHandlerEnvironmentVariableSettingName = "DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER";
         private const string SocketsHttpHandlerAppCtxSettingName = "System.Net.Http.UseSocketsHttpHandler";
 
-        internal static List<Action<HttpRequestMessage>> s_CorrelationPropagationDelegates =
-            new List<Action<HttpRequestMessage>>();
+        //internal static List<Action<HttpRequestMessage>> s_CorrelationPropagationDelegates =
+        //    new List<Action<HttpRequestMessage>>();
 
         private static bool UseSocketsHttpHandler
         {
@@ -42,12 +42,12 @@ namespace System.Net.Http
         
         public static Func<HttpRequestMessage, X509Certificate2, X509Chain, SslPolicyErrors, bool> DangerousAcceptAnyServerCertificateValidator { get; } = delegate { return true; };
 
-        public static void RegisterCorrelationPropagationDelegate(Action<HttpRequestMessage> propagationDelegate)
-        {
-            if (propagationDelegate != null)
-            {
-                s_CorrelationPropagationDelegates.Add(propagationDelegate);
-            }
-        }
+        //public static void RegisterCorrelationPropagationDelegate(Action<HttpRequestMessage> propagationDelegate)
+        //{
+        //    if (propagationDelegate != null)
+        //    {
+        //        s_CorrelationPropagationDelegates.Add(propagationDelegate);
+        //    }
+        //}
     }
 }

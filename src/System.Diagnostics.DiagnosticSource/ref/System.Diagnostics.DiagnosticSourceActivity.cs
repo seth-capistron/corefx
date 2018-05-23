@@ -17,11 +17,11 @@ namespace System.Diagnostics {
     public TimeSpan Duration {get { throw null; } private set {} }    
     public System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>> Tags { get { throw null; } }    
     public System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>> Baggage { get { throw null; } }
-    public System.Collections.Generic.IEnumerable<ExtensibleActivity> ExtensibleActivities { get { throw null; } }
+    public System.Collections.Generic.IEnumerable<ActivityExtension> ActivityExtensions { get { throw null; } }
     public string GetBaggageItem(string key) {throw null;}
     public Activity AddTag(string key, string value) {throw null;}
     public Activity AddBaggage(string key, string value) {throw null;}
-    public T GetExtensibleActivity<T>() where T : ExtensibleActivity { throw null;}
+    public T GetActivityExtension<T>() where T : ActivityExtension { throw null;}
     public Activity SetParentId(string parentId) {throw null;}
     public Activity SetStartTime(DateTime startTimeUtc) {throw null;}
     public Activity SetEndTime(DateTime endTimeUtc) {throw null;}
@@ -38,9 +38,13 @@ namespace System.Diagnostics {
 #endif
         set {}
     }
-    public static void RegisterExtensibleActivityType<T>() where T : ExtensibleActivity {throw null;}
+    public static void RegisterActivityExtension<T>() where T : ActivityExtension { throw null;}
     }
-  public abstract partial class DiagnosticSource {
+    public abstract partial class ActivityExtension {
+        public ActivityExtension(Activity activity) { }
+        protected Activity Activity { get; private set; }
+    }
+    public abstract partial class DiagnosticSource {
     public Activity StartActivity(Activity activity, object args) {throw null;}
     public void StopActivity(Activity activity, object args) {}
   }

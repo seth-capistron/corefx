@@ -7,7 +7,7 @@ namespace System.Diagnostics
     /// <summary>
     /// 
     /// </summary>
-    public abstract partial class ExtensibleActivity
+    public abstract partial class ActivityExtension
     {
         /// <summary>
         /// 
@@ -18,17 +18,11 @@ namespace System.Diagnostics
         /// 
         /// </summary>
         /// <param name="activity"></param>
-        public ExtensibleActivity(Activity activity)
+        public ActivityExtension(Activity activity)
         {
             Activity = activity;
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="parentId"></param>
-        public abstract void SetExternalParentId(string parentId);
-
+        
         /// <summary>
         /// 
         /// </summary>

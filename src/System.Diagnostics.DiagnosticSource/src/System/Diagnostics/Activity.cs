@@ -37,19 +37,17 @@ namespace System.Diagnostics
         /// </summary>
         public string OperationName { get; }
         
-        private static HashSet<Type> s_ExtensibleActivityTypes = new HashSet<Type>();
-
         /// <summary>
         /// 
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        public static void RegisterExtensibleActivityType<T>() where T : ExtensibleActivity
+        public static void RegisterActivityExtension<T>() where T : ActivityExtension
         {
-            lock (s_ExtensibleActivityTypes)
+            lock (s_ActivityExtensionTypes)
             {
-                if (!s_ExtensibleActivityTypes.Contains(typeof(T)))
+                if (!s_ActivityExtensionTypes.Contains(typeof(T)))
                 {
-                    s_ExtensibleActivityTypes.Add(typeof(T));
+                    s_ActivityExtensionTypes.Add(typeof(T));
                 }
             }
         }
@@ -172,13 +170,13 @@ namespace System.Diagnostics
         /// <summary>
         /// 
         /// </summary>
-        public IEnumerable<ExtensibleActivity> ExtensibleActivities
+        public IEnumerable<ActivityExtension> ActivityExtensions
         {
             get
             {
-                foreach( var extensibleActivity in _extensibleActivities.Values)
+                foreach( var activityExtension in _activityExtensions.Values)
                 {
-                    yield return extensibleActivity;
+                    yield return activityExtension;
                 }
             }
         }
@@ -188,11 +186,11 @@ namespace System.Diagnostics
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public T GetExtensibleActivity<T>() where T : ExtensibleActivity
+        public T GetActivityExtension<T>() where T : ActivityExtension
         {
-            if (_extensibleActivities.ContainsKey(typeof(T)))
+            if (_activityExtensions.ContainsKey(typeof(T)))
             {
-                return _extensibleActivities[typeof(T)] as T;
+                return _activityExtensions[typeof(T)] as T;
             }
 
             return null;
@@ -215,13 +213,13 @@ namespace System.Diagnostics
 
             OperationName = operationName;
 
-            foreach (Type extensibleActivityType in s_ExtensibleActivityTypes)
+            foreach (Type activityExtensionTypes in s_ActivityExtensionTypes)
             {
-                Debug.Assert(extensibleActivityType.IsSubclassOf(typeof(ExtensibleActivity)));
+                Debug.Assert(activityExtensionTypes.IsSubclassOf(typeof(ActivityExtension)));
 
-                _extensibleActivities.Add(
-                    extensibleActivityType,
-                    Activator.CreateInstance(extensibleActivityType, this) as ExtensibleActivity);
+                _activityExtensions.Add(
+                    activityExtensionTypes,
+                    Activator.CreateInstance(activityExtensionTypes, this) as ActivityExtension);
             }
         }
 
@@ -367,9 +365,9 @@ namespace System.Diagnostics
                 Id = GenerateId();
                 SetCurrent(this);
 
-                ForEachExtensibleActivity((extensibleActivity) =>
+                ForEachActivityExtension((activityExtension) =>
                 {
-                    extensibleActivity.ActivityStarted();
+                    activityExtension.ActivityStarted();
                 });
             }
 
@@ -402,9 +400,9 @@ namespace System.Diagnostics
 
                 SetCurrent(Parent);
 
-                ForEachExtensibleActivity((extensibleActivity) =>
+                ForEachActivityExtension((activityExtension) =>
                 {
-                    extensibleActivity.ActivityStopped();
+                    activityExtension.ActivityStopped();
                 });
             }
         }
@@ -525,15 +523,15 @@ namespace System.Diagnostics
             return canSet;
         }
 
-        private void ForEachExtensibleActivity(Action<ExtensibleActivity> action)
+        private void ForEachActivityExtension(Action<ActivityExtension> action)
         {
-            foreach (var activity in _extensibleActivities.Values)
+            foreach (var activity in _activityExtensions.Values)
             {
-                var extensibleActivity = activity as ExtensibleActivity;
+                var activityExtension = activity as ActivityExtension;
 
-                if (extensibleActivity != null)
+                if (activityExtension != null)
                 {
-                    action(extensibleActivity);
+                    action(activityExtension);
                 }
             }
         }
@@ -550,8 +548,10 @@ namespace System.Diagnostics
 
         private const int RequestIdMaxLength = 1024;
 
-        private Dictionary<Type, ExtensibleActivity> _extensibleActivities =
-            new Dictionary<Type, ExtensibleActivity>();
+        //private static HashSet<Type> s_ActivityExtensionTypes = new HashSet<Type>();
+        private static List<Type> s_ActivityExtensionTypes = new List<Type>();
+        private Dictionary<Type, ActivityExtension> _activityExtensions =
+            new Dictionary<Type, ActivityExtension>();
 
         /// <summary>
         /// Having our own key-value linked list allows us to be more efficient  

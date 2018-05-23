@@ -31,72 +31,50 @@ namespace System.Diagnostics.Tests
             Assert.Equal(0, activity.Tags.ToList().Count);
         }
 
+        /// <summary>
+        /// Tests Activity Extension behaviors
+        /// </summary>
         [Fact]
-        public void ExtensibleActivity()
+        public void ActivityExtensions()
         {
-            Activity.RegisterExtensibleActivityType<MyExtensibleActivity>();
+            Activity.RegisterActivityExtension<TestActivityExtension>();
+            Activity.RegisterActivityExtension<EmptyActivityExtension>();
 
             var parent = new Activity("parent");
-            MyExtensibleActivity parentExtensibleActivity = parent.GetExtensibleActivity<MyExtensibleActivity>();
 
-            Assert.NotNull(parentExtensibleActivity);
-            Assert.False(parentExtensibleActivity.ActivityStartedCalled);
-            Assert.False(parentExtensibleActivity.ActivityStoppedCalled);
-            Assert.False(parentExtensibleActivity.SetExternalParentCalled);
-            Assert.Null(parentExtensibleActivity.ExternalParentId);
-            Assert.Equal(parent, parentExtensibleActivity.ExposedActivity);
+            Assert.Equal(2, parent.ActivityExtensions.Count());
+            Assert.NotNull(parent.GetActivityExtension<EmptyActivityExtension>());
 
+            TestActivityExtension parentActivityExtension = 
+                parent.GetActivityExtension<TestActivityExtension>();
+
+            Assert.NotNull(parentActivityExtension);
+            Assert.False(parentActivityExtension.ActivityStartedCalled);
+            Assert.False(parentActivityExtension.ActivityStoppedCalled);
+            Assert.Null(parentActivityExtension.ExternalParentId);
+
+            parentActivityExtension.SetExternalParentId("external-Id");
             parent.Start();
 
-            Assert.True(parentExtensibleActivity.ActivityStartedCalled);
+            Assert.True(parent.GetActivityExtension<TestActivityExtension>().ActivityStartedCalled);
+            Assert.Equal("external-Id", parent.GetActivityExtension<TestActivityExtension>().ExternalParentId);
 
             var child = new Activity("child").Start();
-            MyExtensibleActivity childExtensibleActivity = child.GetExtensibleActivity<MyExtensibleActivity>();
+
+            Assert.Equal(2, child.ActivityExtensions.Count());
+            Assert.NotNull(child.GetActivityExtension<EmptyActivityExtension>());
+
+            TestActivityExtension childExtensibleActivity = child.GetActivityExtension<TestActivityExtension>();
 
             Assert.NotNull(childExtensibleActivity);
+            Assert.NotNull(childExtensibleActivity.ExposedActivity);
             Assert.Equal(parent, childExtensibleActivity.ExposedActivity.Parent);
 
             child.Stop();
+            Assert.True(child.GetActivityExtension<TestActivityExtension>().ActivityStoppedCalled);
 
-            Assert.True(childExtensibleActivity.ActivityStoppedCalled);
-        }
-
-        internal class MyExtensibleActivity : ExtensibleActivity
-        {
-            internal bool ActivityStartedCalled { get; private set; }
-
-            internal bool ActivityStoppedCalled { get; private set; }
-
-            internal string ExternalParentId { get; private set; }
-
-            internal bool SetExternalParentCalled { get; private set; }
-
-            internal Activity ExposedActivity
-            {
-                get
-                {
-                    return Activity;
-                }
-            }
-
-            public MyExtensibleActivity(Activity activity) : base(activity)
-            { }
-
-            public override void ActivityStarted()
-            {
-                ActivityStartedCalled = true;
-            }
-
-            public override void ActivityStopped()
-            {
-                ActivityStoppedCalled = true;
-            }
-
-            public override void SetExternalParentId(string parentId)
-            {
-                ExternalParentId = parentId;
-                SetExternalParentCalled = true;
-            }
+            parent.Stop();
+            Assert.True(parent.GetActivityExtension<TestActivityExtension>().ActivityStoppedCalled);
         }
 
         /// <summary>
@@ -680,6 +658,55 @@ namespace System.Diagnostics.Tests
             public void OnCompleted() { }
 
             public void OnError(Exception error) { }
+        }
+
+        private class TestActivityExtension : ActivityExtension
+        {
+            internal bool ActivityStartedCalled { get; private set; }
+
+            internal bool ActivityStoppedCalled { get; private set; }
+
+            internal string ExternalParentId { get; private set; }
+
+            public Activity ExposedActivity
+            {
+                get
+                {
+                    return Activity;
+                }
+            }
+
+            public TestActivityExtension(Activity activity)
+                : base(activity)
+            { }
+
+            public override void ActivityStarted()
+            {
+                ActivityStartedCalled = true;
+            }
+
+            public override void ActivityStopped()
+            {
+                ActivityStoppedCalled = true;
+            }
+
+            public void SetExternalParentId(string value)
+            {
+                ExternalParentId = value;
+            }
+        }
+
+        private class EmptyActivityExtension : ActivityExtension
+        {
+            public EmptyActivityExtension(Activity activity)
+                : base(activity)
+            { }
+
+            public override void ActivityStarted()
+            { }
+
+            public override void ActivityStopped()
+            { }
         }
 
         private const int MaxClockErrorMSec = 20;
