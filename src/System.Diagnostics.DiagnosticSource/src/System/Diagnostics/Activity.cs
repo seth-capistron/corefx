@@ -38,21 +38,6 @@ namespace System.Diagnostics
         public string OperationName { get; }
         
         /// <summary>
-        /// 
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        public static void RegisterActivityExtension<T>() where T : ActivityExtension
-        {
-            lock (s_ActivityExtensionTypes)
-            {
-                if (!s_ActivityExtensionTypes.Contains(typeof(T)))
-                {
-                    s_ActivityExtensionTypes.Add(typeof(T));
-                }
-            }
-        }
-
-        /// <summary>
         /// This is an ID that is specific to a particular request.   Filtering
         /// to a particular ID insures that you get only one request that matches.  
         /// Id has a hierarchical structure: '|root-id.id1_id2.id3_' Id is generated when 
@@ -168,24 +153,22 @@ namespace System.Diagnostics
         }
 
         /// <summary>
-        /// 
+        /// Gets the <see cref="ActivityExtension"/> instances attached to this Activity.
         /// </summary>
         public IEnumerable<ActivityExtension> ActivityExtensions
         {
             get
             {
-                foreach( var activityExtension in _activityExtensions.Values)
-                {
-                    yield return activityExtension;
-                }
+                return _activityExtensions.Values;
             }
         }
 
         /// <summary>
-        /// 
+        /// Gets the <see cref="ActivityExtension"/> instance of the given type, or
+        /// null if it doesn't exist.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <returns></returns>
+        /// <typeparam name="T"><see cref="ActivityExtension"/> type.</typeparam>
+        /// <returns>The <see cref="ActivityExtension"/> instance or null.</returns>
         public T GetActivityExtension<T>() where T : ActivityExtension
         {
             if (_activityExtensions.ContainsKey(typeof(T)))
@@ -407,6 +390,24 @@ namespace System.Diagnostics
             }
         }
 
+        /// <summary>
+        /// Registers an Activity Extension type. After registering an Activity
+        /// Extension type, each new Activity instance that is instantiated will
+        /// have an attached instance of the registered Activity Extension type.
+        /// Multiple Activity Extension types can be registered.
+        /// </summary>
+        /// <typeparam name="T">An <see cref="ActivityExtension"/> type to register.</typeparam>
+        public static void RegisterActivityExtension<T>() where T : ActivityExtension
+        {
+            lock (s_ActivityExtensionTypes)
+            {
+                if (!s_ActivityExtensionTypes.Contains(typeof(T)))
+                {
+                    s_ActivityExtensionTypes.Add(typeof(T));
+                }
+            }
+        }
+
         #region private 
         private static void NotifyError(Exception exception)
         {
@@ -548,7 +549,6 @@ namespace System.Diagnostics
 
         private const int RequestIdMaxLength = 1024;
 
-        //private static HashSet<Type> s_ActivityExtensionTypes = new HashSet<Type>();
         private static List<Type> s_ActivityExtensionTypes = new List<Type>();
         private Dictionary<Type, ActivityExtension> _activityExtensions =
             new Dictionary<Type, ActivityExtension>();

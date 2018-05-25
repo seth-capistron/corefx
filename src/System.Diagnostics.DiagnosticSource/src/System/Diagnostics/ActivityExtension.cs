@@ -5,31 +5,33 @@
 namespace System.Diagnostics
 {
     /// <summary>
-    /// 
+    /// An abstract class that is used to hold additional data for a single
+    /// <see cref="System.Diagnostics.Activity"/> instance.
     /// </summary>
     public abstract partial class ActivityExtension
     {
         /// <summary>
-        /// 
+        /// The <see cref="Activity"/> instance this extension is linked to.
         /// </summary>
         protected Activity Activity { get; private set; }
 
         /// <summary>
-        /// 
+        /// Creates a new <see cref="ActivityExtension"/> instance.
         /// </summary>
-        /// <param name="activity"></param>
+        /// <param name="activity">The <see cref="Activity"/> instance this extension
+        /// is linked to.</param>
         public ActivityExtension(Activity activity)
         {
             Activity = activity;
         }
         
         /// <summary>
-        /// 
+        /// Called after the linked <see cref="Activity"/> is started.
         /// </summary>
         public abstract void ActivityStarted();
 
         /// <summary>
-        /// 
+        /// Called after the linked <see cref="Activity"/> is stopped.
         /// </summary>
         public abstract void ActivityStopped();
     }
