@@ -17,19 +17,19 @@ namespace System.Net.Http
         {
         }
 
-        public Action<HttpRequestMessage> PropagationDelegateOverride { get; set; }
+        public Action<HttpRequestMessage> CorrelationPropagationOverride { get; set; }
 
         protected internal override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            //if (PropagationDelegateOverride != null)
-            //{
-            //    PropagationDelegateOverride(request);
-            //}
-            //else
-            //{
-            //    HttpClientHandler.s_CorrelationPropagationDelegates.ForEach(
-            //        propagationDelegate => { propagationDelegate(request); });
-            //}
+            if (CorrelationPropagationOverride != null)
+            {
+                CorrelationPropagationOverride(request);
+            }
+            else
+            {
+                HttpClientHandler.s_CorrelationPropagationDelegates.ForEach(
+                    propagationDelegate => { propagationDelegate(request); });
+            }
 
             return base.SendAsync(request, cancellationToken);
         }

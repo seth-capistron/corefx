@@ -3,6 +3,8 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 
@@ -14,8 +16,8 @@ namespace System.Net.Http
         private const string SocketsHttpHandlerEnvironmentVariableSettingName = "DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER";
         private const string SocketsHttpHandlerAppCtxSettingName = "System.Net.Http.UseSocketsHttpHandler";
 
-        //internal static List<Action<HttpRequestMessage>> s_CorrelationPropagationDelegates =
-        //    new List<Action<HttpRequestMessage>>();
+        internal static List<Action<HttpRequestMessage>> s_CorrelationPropagationDelegates =
+            new List<Action<HttpRequestMessage>>();
 
         private static bool UseSocketsHttpHandler
         {
@@ -42,12 +44,43 @@ namespace System.Net.Http
         
         public static Func<HttpRequestMessage, X509Certificate2, X509Chain, SslPolicyErrors, bool> DangerousAcceptAnyServerCertificateValidator { get; } = delegate { return true; };
 
-        //public static void RegisterCorrelationPropagationDelegate(Action<HttpRequestMessage> propagationDelegate)
-        //{
-        //    if (propagationDelegate != null)
-        //    {
-        //        s_CorrelationPropagationDelegates.Add(propagationDelegate);
-        //    }
-        //}
+        public static Action<HttpRequestMessage> DefaultActivityPropagationDelegate { get; } =
+            (HttpRequestMessage request) =>
+            {
+                // If we are on at all, we propagate any activity information.  
+                Activity currentActivity = Activity.Current;
+                if (currentActivity != null)
+                {
+                    request.Headers.Add(DiagnosticsHandlerLoggingStrings.RequestIdHeaderName, currentActivity.Id);
+                    //we expect baggage to be empty or contain a few items
+                    using (IEnumerator<KeyValuePair<string, string>> e = currentActivity.Baggage.GetEnumerator())
+                    {
+                        if (e.MoveNext())
+                        {
+                            var baggage = new List<string>();
+                            do
+                            {
+                                KeyValuePair<string, string> item = e.Current;
+                                baggage.Add(new NameValueHeaderValue(item.Key, item.Value).ToString());
+                            }
+                            while (e.MoveNext());
+                            request.Headers.Add(DiagnosticsHandlerLoggingStrings.CorrelationContextHeaderName, baggage);
+                        }
+                    }
+                }
+            };
+
+        public static void RegisterCorrelationPropagationDelegate(Action<HttpRequestMessage> propagationDelegate)
+        {
+            if (propagationDelegate != null)
+            {
+                s_CorrelationPropagationDelegates.Add(propagationDelegate);
+            }
+        }
+
+        static HttpClientHandler()
+        {
+            RegisterCorrelationPropagationDelegate(DefaultActivityPropagationDelegate);
+        }
     }
 }

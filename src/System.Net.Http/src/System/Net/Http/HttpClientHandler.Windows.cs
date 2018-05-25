@@ -23,7 +23,7 @@ namespace System.Net.Http
         private readonly CorrelationPropagationHandler _diagnosticsCorrelationHandler;
         private bool _useProxy;
         private ClientCertificateOption _clientCertificateOptions;
-        //private Action<HttpRequestMessage> _correlationPropagationDelegate;
+        private Action<HttpRequestMessage> _correlationPropagationOverride;
 
         public HttpClientHandler() : this(UseSocketsHttpHandler) { }
 
@@ -446,30 +446,30 @@ namespace System.Net.Http
             }
         }
 
-        //public Action<HttpRequestMessage> CorrelationPropagationDelegate
-        //{
-        //    get
-        //    {
-        //        return _correlationPropagationDelegate;
-        //    }
-        //    set
-        //    {
-        //        _correlationPropagationDelegate = value;
+        public Action<HttpRequestMessage> CorrelationPropagationOverride
+        {
+            get
+            {
+                return _correlationPropagationOverride;
+            }
+            set
+            {
+                _correlationPropagationOverride = value;
 
-        //        if (_winHttpCorrelationHandler != null)
-        //        {
-        //            _winHttpCorrelationHandler.PropagationDelegateOverride = value;
-        //        }
-        //        if (_socketsCorrelationHandler != null)
-        //        {
-        //            _socketsCorrelationHandler.PropagationDelegateOverride = value;
-        //        }
-        //        if (_diagnosticsCorrelationHandler != null)
-        //        {
-        //            _diagnosticsCorrelationHandler.PropagationDelegateOverride = value;
-        //        }
-        //    }
-        //}
+                if (_winHttpCorrelationHandler != null)
+                {
+                    _winHttpCorrelationHandler.CorrelationPropagationOverride = value;
+                }
+                if (_socketsCorrelationHandler != null)
+                {
+                    _socketsCorrelationHandler.CorrelationPropagationOverride = value;
+                }
+                if (_diagnosticsCorrelationHandler != null)
+                {
+                    _diagnosticsCorrelationHandler.CorrelationPropagationOverride = value;
+                }
+            }
+        }
 
         public IDictionary<string, object> Properties => _winHttpHandler != null ?
             _winHttpHandler.Properties :

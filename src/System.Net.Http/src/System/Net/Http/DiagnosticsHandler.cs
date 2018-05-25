@@ -24,35 +24,6 @@ namespace System.Net.Http
         {
         }
 
-        static DiagnosticsHandler()
-        {
-            //HttpClientHandler.RegisterCorrelationPropagationDelegate(
-            //    (HttpRequestMessage request) =>
-            //    {
-            //        // If we are on at all, we propagate any activity information.  
-            //        Activity currentActivity = Activity.Current;
-            //        if (currentActivity != null)
-            //        {
-            //            request.Headers.Add(DiagnosticsHandlerLoggingStrings.RequestIdHeaderName, currentActivity.Id);
-            //            //we expect baggage to be empty or contain a few items
-            //            using (IEnumerator<KeyValuePair<string, string>> e = currentActivity.Baggage.GetEnumerator())
-            //            {
-            //                if (e.MoveNext())
-            //                {
-            //                    var baggage = new List<string>();
-            //                    do
-            //                    {
-            //                        KeyValuePair<string, string> item = e.Current;
-            //                        baggage.Add(new NameValueHeaderValue(item.Key, item.Value).ToString());
-            //                    }
-            //                    while (e.MoveNext());
-            //                    request.Headers.Add(DiagnosticsHandlerLoggingStrings.CorrelationContextHeaderName, baggage);
-            //                }
-            //            }
-            //        }
-            //    });
-        }
-
         internal static bool IsEnabled()
         {
             //check if someone listens to HttpHandlerDiagnosticListener
