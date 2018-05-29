@@ -19,10 +19,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'netstandard1.3-Release|AnyCPU'" />
   <ItemGroup>
     <Compile Include="System.Diagnostics.DiagnosticSource.cs" />
-    <Compile Include="System.Diagnostics.DiagnosticSourceActivityExtension.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetGroup)' != 'netstandard1.1'">
     <Compile Include="System.Diagnostics.DiagnosticSourceActivity.cs" />
+    <Compile Include="System.Diagnostics.DiagnosticSourceActivityExtension.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetGroup)' == 'net45' OR '$(TargetGroup)' == 'netfx'">
     <Reference Include="mscorlib" />

@@ -16,8 +16,11 @@ namespace System.Net.Http
         // Only one of these two handlers will be initialized.
         private readonly CurlHandler _curlHandler;
         private readonly SocketsHttpHandler _socketsHttpHandler;
+        private readonly CorrelationPropagationHandler _curlCorrelationHandler;
+        private readonly CorrelationPropagationHandler _socketsCorrelationHandler;
         private readonly DiagnosticsHandler _diagnosticsHandler;
         private ClientCertificateOption _clientCertificateOptions;
+        private Action<HttpRequestMessage> _correlationPropagationOverride;
 
         public HttpClientHandler() : this(UseSocketsHttpHandler) { }
 
@@ -26,13 +29,15 @@ namespace System.Net.Http
             if (useSocketsHttpHandler)
             {
                 _socketsHttpHandler = new SocketsHttpHandler();
-                _diagnosticsHandler = new DiagnosticsHandler(_socketsHttpHandler);
+                _socketsCorrelationHandler = new CorrelationPropagationHandler(_socketsHttpHandler);
+                _diagnosticsHandler = new DiagnosticsHandler(_socketsCorrelationHandler);
                 ClientCertificateOptions = ClientCertificateOption.Manual;
             }
             else
             {
                 _curlHandler = new CurlHandler();
-                _diagnosticsHandler = new DiagnosticsHandler(_curlHandler);
+                _curlCorrelationHandler = new CorrelationPropagationHandler(_curlHandler);
+                _diagnosticsHandler = new DiagnosticsHandler(_curlCorrelationHandler);
             }
         }
 
@@ -397,13 +402,34 @@ namespace System.Net.Http
             }
         }
 
+        public Action<HttpRequestMessage> CorrelationPropagationOverride
+        {
+            get
+            {
+                return _correlationPropagationOverride;
+            }
+            set
+            {
+                _correlationPropagationOverride = value;
+
+                if (_curlCorrelationHandler != null)
+                {
+                    _curlCorrelationHandler.CorrelationPropagationOverride = value;
+                }
+                if (_socketsCorrelationHandler != null)
+                {
+                    _socketsCorrelationHandler.CorrelationPropagationOverride = value;
+                }
+            }
+        }
+
         public IDictionary<string, object> Properties => _curlHandler != null ?
             _curlHandler.Properties :
             _socketsHttpHandler.Properties;
 
         protected internal override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             DiagnosticsHandler.IsEnabled() ? _diagnosticsHandler.SendAsync(request, cancellationToken) :
-            _curlHandler != null ? _curlHandler.SendAsync(request, cancellationToken) :
-            _socketsHttpHandler.SendAsync(request, cancellationToken);
+            _curlCorrelationHandler != null ? _curlCorrelationHandler.SendAsync(request, cancellationToken) :
+            _socketsCorrelationHandler.SendAsync(request, cancellationToken);
     }
 }

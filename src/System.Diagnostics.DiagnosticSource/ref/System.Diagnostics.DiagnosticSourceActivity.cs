@@ -42,7 +42,7 @@ namespace System.Diagnostics {
     }
     public abstract partial class ActivityExtension {
         public ActivityExtension(Activity activity) { }
-        protected Activity Activity { get; private set; }
+        public Activity Activity { get; private set; }
     }
     public abstract partial class DiagnosticSource {
     public Activity StartActivity(Activity activity, object args) {throw null;}

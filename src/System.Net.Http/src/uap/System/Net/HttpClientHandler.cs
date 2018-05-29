@@ -49,7 +49,7 @@ namespace System.Net.Http
 
         #region Fields
 
-        private readonly HttpHandlerToFilter _handlerToFilter;
+        private readonly CorrelationPropagationHandler _correlationHandler;
         private readonly HttpMessageHandler _diagnosticsPipeline;
 
         private RTHttpBaseProtocolFilter _rtFilter;
@@ -337,6 +337,18 @@ namespace System.Net.Http
             }
         }
 
+        public Action<HttpRequestMessage> CorrelationPropagationOverride
+        {
+            get
+            {
+                return _correlationHandler.CorrelationPropagationOverride;
+            }
+            set
+            {
+                _correlationHandler.CorrelationPropagationOverride = value;
+            }
+        }
+
         public IDictionary<String, Object> Properties
         {
             get
@@ -358,10 +370,13 @@ namespace System.Net.Http
         {
             _rtFilter = CreateFilter();
 
-            _handlerToFilter = new HttpHandlerToFilter(_rtFilter, this);
-            _handlerToFilter.RequestMessageLookupKey = RequestMessageLookupKey;
-            _handlerToFilter.SavedExceptionDispatchInfoLookupKey = SavedExceptionDispatchInfoLookupKey;
-            _diagnosticsPipeline = new DiagnosticsHandler(_handlerToFilter);
+            var handlerToFilter = new HttpHandlerToFilter(_rtFilter, this)
+            {
+                RequestMessageLookupKey = RequestMessageLookupKey,
+                SavedExceptionDispatchInfoLookupKey = SavedExceptionDispatchInfoLookupKey
+            };
+            _correlationHandler = new CorrelationPropagationHandler(handlerToFilter);
+            _diagnosticsPipeline = new DiagnosticsHandler(_correlationHandler);
 
             _clientCertificateOptions = ClientCertificateOption.Manual;
 
@@ -602,7 +617,7 @@ namespace System.Net.Http
 
                 Task<HttpResponseMessage> responseTask = DiagnosticsHandler.IsEnabled() ? 
                     _diagnosticsPipeline.SendAsync(request, cancellationToken) :
-                    _handlerToFilter.SendAsync(request, cancellationToken);
+                    _correlationHandler.SendAsync(request, cancellationToken);
 
                 response = await responseTask.ConfigureAwait(false);
             }

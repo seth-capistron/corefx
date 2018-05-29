@@ -198,8 +198,6 @@ namespace System.Diagnostics
 
             foreach (Type activityExtensionTypes in s_ActivityExtensionTypes)
             {
-                Debug.Assert(activityExtensionTypes.IsSubclassOf(typeof(ActivityExtension)));
-
                 _activityExtensions.Add(
                     activityExtensionTypes,
                     Activator.CreateInstance(activityExtensionTypes, this) as ActivityExtension);

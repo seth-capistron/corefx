@@ -11,27 +11,27 @@ namespace System.Diagnostics
     public abstract partial class ActivityExtension
     {
         /// <summary>
-        /// The <see cref="Activity"/> instance this extension is linked to.
+        /// The <see cref="Diagnostics.Activity"/> instance this extension is linked to.
         /// </summary>
-        protected Activity Activity { get; private set; }
+        public Activity Activity { get; private set; }
 
         /// <summary>
         /// Creates a new <see cref="ActivityExtension"/> instance.
         /// </summary>
-        /// <param name="activity">The <see cref="Activity"/> instance this extension
+        /// <param name="activity">The <see cref="Diagnostics.Activity"/> instance this extension
         /// is linked to.</param>
         public ActivityExtension(Activity activity)
         {
             Activity = activity;
         }
-        
+
         /// <summary>
-        /// Called after the linked <see cref="Activity"/> is started.
+        /// Called after the linked <see cref="Diagnostics.Activity"/> is started.
         /// </summary>
         public abstract void ActivityStarted();
 
         /// <summary>
-        /// Called after the linked <see cref="Activity"/> is stopped.
+        /// Called after the linked <see cref="Diagnostics.Activity"/> is stopped.
         /// </summary>
         public abstract void ActivityStopped();
     }

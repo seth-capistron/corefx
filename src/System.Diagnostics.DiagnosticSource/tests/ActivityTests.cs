@@ -67,8 +67,8 @@ namespace System.Diagnostics.Tests
             TestActivityExtension childExtensibleActivity = child.GetActivityExtension<TestActivityExtension>();
 
             Assert.NotNull(childExtensibleActivity);
-            Assert.NotNull(childExtensibleActivity.ExposedActivity);
-            Assert.Equal(parent, childExtensibleActivity.ExposedActivity.Parent);
+            Assert.NotNull(childExtensibleActivity.Activity);
+            Assert.Equal(parent, childExtensibleActivity.Activity.Parent);
 
             child.Stop();
             Assert.True(child.GetActivityExtension<TestActivityExtension>().ActivityStoppedCalled);
@@ -667,15 +667,7 @@ namespace System.Diagnostics.Tests
             internal bool ActivityStoppedCalled { get; private set; }
 
             internal string ExternalParentId { get; private set; }
-
-            public Activity ExposedActivity
-            {
-                get
-                {
-                    return Activity;
-                }
-            }
-
+            
             public TestActivityExtension(Activity activity)
                 : base(activity)
             { }

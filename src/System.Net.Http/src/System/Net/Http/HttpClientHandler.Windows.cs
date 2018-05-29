@@ -20,7 +20,6 @@ namespace System.Net.Http
         private readonly CorrelationPropagationHandler _winHttpCorrelationHandler;
         private readonly CorrelationPropagationHandler _socketsCorrelationHandler;
         private readonly DiagnosticsHandler _diagnosticsHandler;
-        private readonly CorrelationPropagationHandler _diagnosticsCorrelationHandler;
         private bool _useProxy;
         private ClientCertificateOption _clientCertificateOptions;
         private Action<HttpRequestMessage> _correlationPropagationOverride;
@@ -33,8 +32,7 @@ namespace System.Net.Http
             {
                 _socketsHttpHandler = new SocketsHttpHandler();
                 _socketsCorrelationHandler = new CorrelationPropagationHandler(_socketsHttpHandler);
-                _diagnosticsCorrelationHandler = new CorrelationPropagationHandler(_socketsHttpHandler);
-                _diagnosticsHandler = new DiagnosticsHandler(_diagnosticsCorrelationHandler);
+                _diagnosticsHandler = new DiagnosticsHandler(_socketsCorrelationHandler);
                 ClientCertificateOptions = ClientCertificateOption.Manual;
 
             }
@@ -42,8 +40,7 @@ namespace System.Net.Http
             {
                 _winHttpHandler = new WinHttpHandler();
                 _winHttpCorrelationHandler = new CorrelationPropagationHandler(_winHttpHandler);
-                _diagnosticsCorrelationHandler = new CorrelationPropagationHandler(_winHttpHandler);
-                _diagnosticsHandler = new DiagnosticsHandler(_diagnosticsCorrelationHandler);
+                _diagnosticsHandler = new DiagnosticsHandler(_winHttpCorrelationHandler);
 
                 // Adjust defaults to match current .NET Desktop HttpClientHandler (based on HWR stack).
                 AllowAutoRedirect = true;
@@ -463,10 +460,6 @@ namespace System.Net.Http
                 if (_socketsCorrelationHandler != null)
                 {
                     _socketsCorrelationHandler.CorrelationPropagationOverride = value;
-                }
-                if (_diagnosticsCorrelationHandler != null)
-                {
-                    _diagnosticsCorrelationHandler.CorrelationPropagationOverride = value;
                 }
             }
         }

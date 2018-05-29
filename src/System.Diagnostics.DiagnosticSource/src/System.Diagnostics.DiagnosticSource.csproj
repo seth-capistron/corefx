@@ -38,11 +38,11 @@
     <Compile Include="System\Diagnostics\DiagnosticSource.cs" />
     <Compile Include="System\Diagnostics\DiagnosticListener.cs" />
     <Compile Include="System\Diagnostics\DiagnosticSourceEventSource.cs" />
-    <Compile Include="System\Diagnostics\ActivityExtension.cs" />
     <None Include="DiagnosticSourceUsersGuide.md" />
   </ItemGroup>
   <ItemGroup Condition=" '$(TargetGroup)' != 'netstandard1.1'">
     <Compile Include="System\Diagnostics\Activity.cs" />
+    <Compile Include="System\Diagnostics\ActivityExtension.cs" />
     <Compile Include="System\Diagnostics\DiagnosticSourceActivity.cs" />
     <None Include="ActivityUserGuide.md" />
   </ItemGroup>
