@@ -21,16 +21,31 @@ namespace System.Net.Http.Functional.Tests
         protected HttpClientHandler CreateHttpClientHandler() => CreateHttpClientHandler(UseSocketsHttpHandler);
 
         protected static HttpClient CreateHttpClient(string useSocketsHttpHandlerBoolString) =>
-            new HttpClient(CreateHttpClientHandler(useSocketsHttpHandlerBoolString));
+            CreateHttpClient(useSocketsHttpHandlerBoolString, null);
+
+        protected static HttpClient CreateHttpClient(
+            string useSocketsHttpHandlerBoolString,
+            Action<HttpRequestMessage> correlationPropagationOverride) =>
+                new HttpClient(CreateHttpClientHandler(useSocketsHttpHandlerBoolString, correlationPropagationOverride));
 
         protected static HttpClientHandler CreateHttpClientHandler(string useSocketsHttpHandlerBoolString) =>
             CreateHttpClientHandler(bool.Parse(useSocketsHttpHandlerBoolString));
 
-        protected static HttpClientHandler CreateHttpClientHandler(bool useSocketsHttpHandler)
+        protected static HttpClientHandler CreateHttpClientHandler(
+            string useSocketsHttpHandlerBoolString,
+            Action<HttpRequestMessage> correlationPropagationOverride) =>
+                CreateHttpClientHandler(bool.Parse(useSocketsHttpHandlerBoolString), correlationPropagationOverride);
+
+        protected static HttpClientHandler CreateHttpClientHandler(bool useSocketsHttpHandler) =>
+            CreateHttpClientHandler(useSocketsHttpHandler, null);
+
+        protected static HttpClientHandler CreateHttpClientHandler(
+            bool useSocketsHttpHandler,
+            Action<HttpRequestMessage> correlationPropagationOverride)
         {
             if (PlatformDetection.IsUap || PlatformDetection.IsFullFramework || useSocketsHttpHandler)
             {
-                return new HttpClientHandler();
+                return new HttpClientHandler() { CorrelationPropagationOverride = correlationPropagationOverride };
             }
 
             // Create platform specific handler.
@@ -39,6 +54,8 @@ namespace System.Net.Http.Functional.Tests
 
             HttpClientHandler handler = (HttpClientHandler)ctor.Invoke(new object[] { useSocketsHttpHandler });
             Debug.Assert(useSocketsHttpHandler == IsSocketsHttpHandler(handler), "Unexpected handler.");
+
+            handler.CorrelationPropagationOverride = correlationPropagationOverride;
 
             return handler;
         }
