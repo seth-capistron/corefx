@@ -21,6 +21,7 @@
     <Compile Include="DiagnosticSourceEventSourceBridgeTests.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CorrelationVectorTests.cs" />
     <Compile Include="DiagnosticSourceTests.cs" />
   </ItemGroup>
   <ItemGroup Condition=" '$(TargetGroup)' != 'netstandard1.1'">

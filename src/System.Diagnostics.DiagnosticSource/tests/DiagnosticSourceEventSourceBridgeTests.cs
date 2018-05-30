@@ -594,7 +594,7 @@ namespace System.Diagnostics.Tests
                 eventSourceListener.ResetEventCountAndLastEvent();
 
                 // Stop the ASP.NET request.  
-                aspNetCoreSource.Write("Microsoft.AspNetCore.Hosting.EndRequest", 
+                aspNetCoreSource.Write("Microsoft.AspNetCore.Hosting.EndRequest",
                     new
                     {
                         httpContext = new
