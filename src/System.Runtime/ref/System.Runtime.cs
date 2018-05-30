@@ -5075,13 +5075,17 @@ namespace System.IO
         public override System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
         public virtual void Lock(long position, long length) { }
         public override int Read(byte[] array, int offset, int count) { throw null; }
+        public override int Read(System.Span<byte> buffer) { throw null; }
         public override System.Threading.Tasks.Task<int> ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public override System.Threading.Tasks.ValueTask<int> ReadAsync(System.Memory<byte> buffer, System.Threading.CancellationToken cancellationToken = default) { throw null; }
         public override int ReadByte() { throw null; }
         public override long Seek(long offset, System.IO.SeekOrigin origin) { throw null; }
         public override void SetLength(long value) { }
         public virtual void Unlock(long position, long length) { }
         public override void Write(byte[] array, int offset, int count) { }
+        public override void Write(System.ReadOnlySpan<byte> buffer) { throw null; }
         public override System.Threading.Tasks.Task WriteAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public override System.Threading.Tasks.ValueTask WriteAsync(System.ReadOnlyMemory<byte> buffer, System.Threading.CancellationToken cancellationToken = default) { throw null; }
         public override void WriteByte(byte value) { }
     }
     public enum HandleInheritability
@@ -7580,6 +7584,12 @@ namespace System.Text
         public System.Text.StringBuilder AppendJoin<T>(string separator, System.Collections.Generic.IEnumerable<T> values) { throw null; }
         public System.Text.StringBuilder AppendLine() { throw null; }
         public System.Text.StringBuilder AppendLine(string value) { throw null; }
+        public struct ChunkEnumerator
+        {
+            public ChunkEnumerator GetEnumerator() { throw null; }
+            public bool MoveNext() { throw null; }
+            public ReadOnlyMemory<char> Current { get { throw null; } }
+        }
         public System.Text.StringBuilder Clear() { throw null; }
         public void CopyTo(int sourceIndex, char[] destination, int destinationIndex, int count) { }
         public void CopyTo(int sourceIndex, System.Span<char> destination, int count) { }
@@ -7609,6 +7619,7 @@ namespace System.Text
         public System.Text.StringBuilder Insert(int index, uint value) { throw null; }
         [System.CLSCompliantAttribute(false)]
         public System.Text.StringBuilder Insert(int index, ulong value) { throw null; }
+        public ChunkEnumerator GetChunks() { throw null; }
         public System.Text.StringBuilder Remove(int startIndex, int length) { throw null; }
         public System.Text.StringBuilder Replace(char oldChar, char newChar) { throw null; }
         public System.Text.StringBuilder Replace(char oldChar, char newChar, int startIndex, int count) { throw null; }
