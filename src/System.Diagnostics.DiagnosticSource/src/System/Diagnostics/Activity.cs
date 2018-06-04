@@ -36,7 +36,7 @@ namespace System.Diagnostics
         /// the name but rather in the tags.  
         /// </summary>
         public string OperationName { get; }
-
+        
         /// <summary>
         /// This is an ID that is specific to a particular request.   Filtering
         /// to a particular ID insures that you get only one request that matches.  
@@ -152,6 +152,33 @@ namespace System.Diagnostics
             return null;
         }
 
+        /// <summary>
+        /// Gets the <see cref="ActivityExtension"/> instances attached to this Activity.
+        /// </summary>
+        public IEnumerable<ActivityExtension> ActivityExtensions
+        {
+            get
+            {
+                return _activityExtensions.Values;
+            }
+        }
+
+        /// <summary>
+        /// Gets the <see cref="ActivityExtension"/> instance of the given type, or
+        /// null if it doesn't exist.
+        /// </summary>
+        /// <typeparam name="T"><see cref="ActivityExtension"/> type.</typeparam>
+        /// <returns>The <see cref="ActivityExtension"/> instance or null.</returns>
+        public T GetActivityExtension<T>() where T : ActivityExtension
+        {
+            if (_activityExtensions.ContainsKey(typeof(T)))
+            {
+                return _activityExtensions[typeof(T)] as T;
+            }
+
+            return null;
+        }
+
         /* Constructors  Builder methods */
 
         /// <summary>
@@ -168,6 +195,13 @@ namespace System.Diagnostics
             }
 
             OperationName = operationName;
+
+            foreach (Type activityExtensionTypes in s_ActivityExtensionTypes)
+            {
+                _activityExtensions.Add(
+                    activityExtensionTypes,
+                    Activator.CreateInstance(activityExtensionTypes, this) as ActivityExtension);
+            }
         }
 
         /// <summary>
@@ -311,7 +345,13 @@ namespace System.Diagnostics
 
                 Id = GenerateId();
                 SetCurrent(this);
+
+                ForEachActivityExtension((activityExtension) =>
+                {
+                    activityExtension.ActivityStarted();
+                });
             }
+
             return this;
         }
 
@@ -340,6 +380,29 @@ namespace System.Diagnostics
                 }
 
                 SetCurrent(Parent);
+
+                ForEachActivityExtension((activityExtension) =>
+                {
+                    activityExtension.ActivityStopped();
+                });
+            }
+        }
+
+        /// <summary>
+        /// Registers an Activity Extension type. After registering an Activity
+        /// Extension type, each new Activity instance that is instantiated will
+        /// have an attached instance of the registered Activity Extension type.
+        /// Multiple Activity Extension types can be registered.
+        /// </summary>
+        /// <typeparam name="T">An <see cref="ActivityExtension"/> type to register.</typeparam>
+        public static void RegisterActivityExtension<T>() where T : ActivityExtension
+        {
+            lock (s_ActivityExtensionTypes)
+            {
+                if (!s_ActivityExtensionTypes.Contains(typeof(T)))
+                {
+                    s_ActivityExtensionTypes.Add(typeof(T));
+                }
             }
         }
 
@@ -436,7 +499,7 @@ namespace System.Diagnostics
             // It is important that the part that changes frequently be first, because
             // many hash functions don't 'randomize' the tail of a string.   This makes
             // sampling based on the hash produce poor samples.
-            return  '|' + Interlocked.Increment(ref s_currentRootId).ToString("x") + s_uniqSuffix;
+            return '|' + Interlocked.Increment(ref s_currentRootId).ToString("x") + s_uniqSuffix;
         }
 #if ALLOW_PARTIALLY_TRUSTED_CALLERS
         [SecuritySafeCritical]
@@ -459,6 +522,19 @@ namespace System.Diagnostics
             return canSet;
         }
 
+        private void ForEachActivityExtension(Action<ActivityExtension> action)
+        {
+            foreach (var activity in _activityExtensions.Values)
+            {
+                var activityExtension = activity as ActivityExtension;
+
+                if (activityExtension != null)
+                {
+                    action(activityExtension);
+                }
+            }
+        }
+
         private string _rootId;
         private int _currentChildId;  // A unique number for all children of this activity.  
 
@@ -470,6 +546,10 @@ namespace System.Diagnostics
         private static long s_currentRootId = (uint)GetRandomNumber();
 
         private const int RequestIdMaxLength = 1024;
+
+        private static List<Type> s_ActivityExtensionTypes = new List<Type>();
+        private Dictionary<Type, ActivityExtension> _activityExtensions =
+            new Dictionary<Type, ActivityExtension>();
 
         /// <summary>
         /// Having our own key-value linked list allows us to be more efficient  

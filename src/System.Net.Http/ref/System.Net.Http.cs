@@ -87,8 +87,10 @@ namespace System.Net.Http
         public System.Net.Http.ClientCertificateOption ClientCertificateOptions { get { throw null; } set { } }
         public System.Security.Cryptography.X509Certificates.X509CertificateCollection ClientCertificates { get { throw null; } }
         public System.Net.CookieContainer CookieContainer { get { throw null; } set { } }
+        public Action<HttpRequestMessage> CorrelationPropagationOverride { get { throw null; } set { } }
         public System.Net.ICredentials Credentials { get { throw null; } set { } }
         public static System.Func<System.Net.Http.HttpRequestMessage, System.Security.Cryptography.X509Certificates.X509Certificate2, System.Security.Cryptography.X509Certificates.X509Chain, System.Net.Security.SslPolicyErrors, bool> DangerousAcceptAnyServerCertificateValidator { get { throw null; } }
+        public static Action<HttpRequestMessage> DefaultActivityPropagationDelegate { get { throw null; } }
         public System.Net.ICredentials DefaultProxyCredentials { get { throw null; } set { } }
         public int MaxAutomaticRedirections { get { throw null; } set { } }
         public int MaxConnectionsPerServer { get { throw null; } set { } }
@@ -106,6 +108,7 @@ namespace System.Net.Http
         public bool UseDefaultCredentials { get { throw null; } set { } }
         public bool UseProxy { get { throw null; } set { } }
         protected override void Dispose(bool disposing) { }
+        public static void RegisterCorrelationPropagationDelegate(Action<HttpRequestMessage> propagationDelegate) { }
         protected internal override System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
     public enum HttpCompletionOption

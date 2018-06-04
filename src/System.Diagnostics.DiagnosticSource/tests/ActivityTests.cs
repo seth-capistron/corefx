@@ -32,6 +32,52 @@ namespace System.Diagnostics.Tests
         }
 
         /// <summary>
+        /// Tests Activity Extension behaviors
+        /// </summary>
+        [Fact]
+        public void ActivityExtensions()
+        {
+            Activity.RegisterActivityExtension<TestActivityExtension>();
+            Activity.RegisterActivityExtension<EmptyActivityExtension>();
+
+            var parent = new Activity("parent");
+
+            Assert.Equal(2, parent.ActivityExtensions.Count());
+            Assert.NotNull(parent.GetActivityExtension<EmptyActivityExtension>());
+
+            TestActivityExtension parentActivityExtension = 
+                parent.GetActivityExtension<TestActivityExtension>();
+
+            Assert.NotNull(parentActivityExtension);
+            Assert.False(parentActivityExtension.ActivityStartedCalled);
+            Assert.False(parentActivityExtension.ActivityStoppedCalled);
+            Assert.Null(parentActivityExtension.ExternalParentId);
+
+            parentActivityExtension.SetExternalParentId("external-Id");
+            parent.Start();
+
+            Assert.True(parent.GetActivityExtension<TestActivityExtension>().ActivityStartedCalled);
+            Assert.Equal("external-Id", parent.GetActivityExtension<TestActivityExtension>().ExternalParentId);
+
+            var child = new Activity("child").Start();
+
+            Assert.Equal(2, child.ActivityExtensions.Count());
+            Assert.NotNull(child.GetActivityExtension<EmptyActivityExtension>());
+
+            TestActivityExtension childExtensibleActivity = child.GetActivityExtension<TestActivityExtension>();
+
+            Assert.NotNull(childExtensibleActivity);
+            Assert.NotNull(childExtensibleActivity.Activity);
+            Assert.Equal(parent, childExtensibleActivity.Activity.Parent);
+
+            child.Stop();
+            Assert.True(child.GetActivityExtension<TestActivityExtension>().ActivityStoppedCalled);
+
+            parent.Stop();
+            Assert.True(parent.GetActivityExtension<TestActivityExtension>().ActivityStoppedCalled);
+        }
+
+        /// <summary>
         /// Tests baggage operations
         /// </summary>
         [Fact]
@@ -612,6 +658,47 @@ namespace System.Diagnostics.Tests
             public void OnCompleted() { }
 
             public void OnError(Exception error) { }
+        }
+
+        private class TestActivityExtension : ActivityExtension
+        {
+            internal bool ActivityStartedCalled { get; private set; }
+
+            internal bool ActivityStoppedCalled { get; private set; }
+
+            internal string ExternalParentId { get; private set; }
+            
+            public TestActivityExtension(Activity activity)
+                : base(activity)
+            { }
+
+            public override void ActivityStarted()
+            {
+                ActivityStartedCalled = true;
+            }
+
+            public override void ActivityStopped()
+            {
+                ActivityStoppedCalled = true;
+            }
+
+            public void SetExternalParentId(string value)
+            {
+                ExternalParentId = value;
+            }
+        }
+
+        private class EmptyActivityExtension : ActivityExtension
+        {
+            public EmptyActivityExtension(Activity activity)
+                : base(activity)
+            { }
+
+            public override void ActivityStarted()
+            { }
+
+            public override void ActivityStopped()
+            { }
         }
 
         private const int MaxClockErrorMSec = 20;
