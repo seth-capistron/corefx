@@ -259,6 +259,100 @@ namespace System.Net.Http.Functional.Tests
             }, UseSocketsHttpHandler.ToString()).Dispose();
         }
 
+        [OuterLoop] // TODO: Issue #11345
+        [Fact]
+        public void SendAsync_ExpectedCorrelationPropagationWithoutDiagnosticSource()
+        {
+            RemoteInvoke(useSocketsHttpHandlerString =>
+            {
+                string correlationPropagationHeaderName = "X-CorrelationPropagation";
+                string correlationPropagationHeaderValue = Guid.NewGuid().ToString();
+
+                HttpClientHandler.RegisterCorrelationPropagationDelegate(
+                    (requestMessage) =>
+                    {
+                        requestMessage.Headers.Add(
+                            correlationPropagationHeaderName,
+                            correlationPropagationHeaderValue);
+                    });
+
+                using (HttpClient client = CreateHttpClient(useSocketsHttpHandlerString))
+                {
+                    LoopbackServer.CreateServerAsync(async (server, url) =>
+                    {
+                        Task<List<string>> requestLines = server.AcceptConnectionSendResponseAndCloseAsync();
+                        Task<HttpResponseMessage> response = client.GetAsync(url);
+                        await new Task[] { response, requestLines }.WhenAllOrAnyFailed();
+
+                        AssertCorrelationHeaderIsInjected(
+                            requestLines.Result,
+                            correlationPropagationHeaderName,
+                            correlationPropagationHeaderValue,
+                            expectedToBeInjected: true);
+
+                        response.Result.Dispose();
+                    }).Wait();
+                }
+
+                return SuccessExitCode;
+            }, UseSocketsHttpHandler.ToString()).Dispose();
+        }
+
+        [OuterLoop] // TODO: Issue #11345
+        [Fact]
+        public void SendAsync_ExpectedCorrelationPropagationUsingOverride()
+        {
+            RemoteInvoke(useSocketsHttpHandlerString =>
+            {
+                string staticPropagationHeaderName = "X-StaticCorrelationPropagation";
+                string overridePropagationHeaderName = "X-OverrideCorrelationPropagation";
+                string correlationPropagationHeaderValue = Guid.NewGuid().ToString();
+
+                HttpClientHandler.RegisterCorrelationPropagationDelegate(
+                    (requestMessage) =>
+                    {
+                        requestMessage.Headers.Add(
+                            staticPropagationHeaderName,
+                            Guid.NewGuid().ToString());
+                    });
+
+                Action<HttpRequestMessage> correlationPropagationOverride =
+                    (requestMessage) =>
+                    {
+                        requestMessage.Headers.Add(
+                            overridePropagationHeaderName,
+                            correlationPropagationHeaderValue);
+                    };
+
+                using (HttpClient client = CreateHttpClient(useSocketsHttpHandlerString, correlationPropagationOverride))
+                {
+
+                    LoopbackServer.CreateServerAsync(async (server, url) =>
+                    {
+                        Task<List<string>> requestLines = server.AcceptConnectionSendResponseAndCloseAsync();
+                        Task<HttpResponseMessage> response = client.GetAsync(url);
+                        await new Task[] { response, requestLines }.WhenAllOrAnyFailed();
+
+                        AssertCorrelationHeaderIsInjected(
+                            requestLines.Result,
+                            overridePropagationHeaderName,
+                            correlationPropagationHeaderValue,
+                            expectedToBeInjected: true);
+
+                        AssertCorrelationHeaderIsInjected(
+                            requestLines.Result,
+                            staticPropagationHeaderName,
+                            expectedHeaderValue: null,
+                            expectedToBeInjected: false);
+
+                        response.Result.Dispose();
+                    }).Wait();
+                }
+
+                return SuccessExitCode;
+            }, UseSocketsHttpHandler.ToString()).Dispose();
+        }
+
         [ActiveIssue(23209)]
         [OuterLoop] // TODO: Issue #11345
         [Fact]
@@ -317,11 +411,22 @@ namespace System.Net.Http.Functional.Tests
                 bool activityStopLogged = false;
                 bool exceptionLogged = false;
 
+                string correlationPropagationHeaderName = "X-CorrelationPropagation";
+                string correlationPropagationHeaderValue = Guid.NewGuid().ToString();
+
                 Activity parentActivity = new Activity("parent");
                 parentActivity.AddBaggage("correlationId", Guid.NewGuid().ToString());
                 parentActivity.AddBaggage("moreBaggage", Guid.NewGuid().ToString());
                 parentActivity.AddTag("tag", "tag"); //add tag to ensure it is not injected into request
                 parentActivity.Start();
+
+                HttpClientHandler.RegisterCorrelationPropagationDelegate(
+                    (requestMessage) =>
+                    {
+                        requestMessage.Headers.Add(
+                            correlationPropagationHeaderName,
+                            correlationPropagationHeaderValue);
+                    });
 
                 var diagnosticListenerObserver = new FakeDiagnosticListenerObserver(kvp =>
                 {
@@ -364,6 +469,12 @@ namespace System.Net.Http.Functional.Tests
                             await new Task[] { response, requestLines }.WhenAllOrAnyFailed();
 
                             AssertHeadersAreInjected(requestLines.Result, parentActivity);
+                            AssertCorrelationHeaderIsInjected(
+                                requestLines.Result,
+                                correlationPropagationHeaderName,
+                                correlationPropagationHeaderValue,
+                                expectedToBeInjected: true);
+
                             response.Result.Dispose();
                         }).Wait();
                     }
@@ -772,6 +883,37 @@ namespace System.Net.Http.Functional.Tests
             Assert.False(SpinWait.SpinUntil(p, timeout), message);
         }
 
+        private static void AssertCorrelationHeaderIsInjected(
+            List<string> requestLines,
+            string headerName,
+            string expectedHeaderValue,
+            bool expectedToBeInjected)
+        {
+            string actualHeaderValue = null;
+
+            foreach (var line in requestLines)
+            {
+                if (line.StartsWith(headerName))
+                {
+                    actualHeaderValue = line.Substring(headerName.Length).Trim(' ', ':');
+                }
+            }
+
+            if (expectedToBeInjected)
+            {
+                Assert.True(
+                    actualHeaderValue != null,
+                    "Correlation Propagation header was not injected into the request");
+                Assert.Equal(expectedHeaderValue, actualHeaderValue);
+            }
+            else
+            {
+                Assert.True(
+                    actualHeaderValue == null,
+                    "Correlation Propagation header was injected into the request");
+            }
+        }
+
         private static void AssertHeadersAreInjected(List<string> requestLines, Activity parent)
         {
             string requestId = null;
@@ -795,7 +937,7 @@ namespace System.Net.Http.Functional.Tests
             Assert.True(requestId != null, "Request-Id was not injected when instrumentation was enabled");
             Assert.True(requestId.StartsWith(parent.Id));
             Assert.NotEqual(parent.Id, requestId);
-
+            
             List<KeyValuePair<string, string>> baggage = parent.Baggage.ToList();
             Assert.Equal(baggage.Count, correlationContext.Count);
             foreach (var kvp in baggage)

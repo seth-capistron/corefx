@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), dir.props))\dir.props" />
   <PropertyGroup>
@@ -32,6 +32,7 @@
     <Compile Include="System\Net\Http\ByteArrayContent.cs" />
     <Compile Include="System\Net\Http\ByteArrayHelpers.cs" />
     <Compile Include="System\Net\Http\ClientCertificateOption.cs" />
+    <Compile Include="System\Net\Http\CorrelationPropagationHandler.cs" />
     <Compile Include="System\Net\Http\DelegatingHandler.cs" />
     <Compile Include="System\Net\Http\FormUrlEncodedContent.cs" />
     <Compile Include="System\Net\Http\Headers\KnownHeader.cs" />
@@ -642,6 +643,9 @@
     <Reference Include="System.Security.Cryptography.Algorithms" />
     <Reference Include="System.Security.Cryptography.Encoding" />
     <Reference Include="System.Security.Cryptography.Primitives" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Common\CoreLib\System\Threading\Tasks\" />
   </ItemGroup>
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), dir.targets))\dir.targets" />
 </Project>

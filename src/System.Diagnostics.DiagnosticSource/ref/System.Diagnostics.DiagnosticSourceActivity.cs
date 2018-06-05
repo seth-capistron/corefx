@@ -13,14 +13,18 @@ namespace System.Diagnostics {
     public DateTime StartTimeUtc {get { throw null; } private set {} }
     public Activity Parent {get { throw null; } private set {} }
     public string ParentId {get { throw null; } private set {} }
+    public bool IsParentExternal {get { throw null; } private set {} }
     public string RootId {get { throw null; } private set {} }    
     public TimeSpan Duration {get { throw null; } private set {} }    
     public System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>> Tags { get { throw null; } }    
     public System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>> Baggage { get { throw null; } }
+    public System.Collections.Generic.IEnumerable<ActivityExtension> ActivityExtensions { get { throw null; } }
     public string GetBaggageItem(string key) {throw null;}
     public Activity AddTag(string key, string value) {throw null;}
     public Activity AddBaggage(string key, string value) {throw null;}
+    public T GetActivityExtension<T>() where T : ActivityExtension { throw null;}
     public Activity SetParentId(string parentId) {throw null;}
+    public T SetParentId<T>() where T : ActivityExtension {throw null;}
     public Activity SetStartTime(DateTime startTimeUtc) {throw null;}
     public Activity SetEndTime(DateTime endTimeUtc) {throw null;}
     public Activity Start() {throw null;}
@@ -36,10 +40,26 @@ namespace System.Diagnostics {
 #endif
         set {}
     }
+    public static void RegisterActivityExtension<T>() where T : ActivityExtension { throw null;}
   }
   public abstract partial class DiagnosticSource {
     public Activity StartActivity(Activity activity, object args) {throw null;}
     public void StopActivity(Activity activity, object args) {}
+  }
+  public abstract partial class ActivityExtension {
+    public ActivityExtension(Activity activity) { }
+    public Activity Activity { get; private set; }
+    public abstract void ActivityStarted();
+    public abstract void ActivityStopped();
+  }
+  public partial class LegacyActivityExtension : ActivityExtension {
+    public LegacyActivityExtension(Activity activity) : base(activity) { }
+    public string Id { get { throw null; } private set { } }
+    public string ParentId { get { throw null; } private set { } }
+    public string RootId { get { throw null; } private set { } }
+    public override void ActivityStarted() { throw null; }
+    public override void ActivityStopped() { throw null; }
+    public void SetParentId(string parentId) { throw null; }
   }
 }
 

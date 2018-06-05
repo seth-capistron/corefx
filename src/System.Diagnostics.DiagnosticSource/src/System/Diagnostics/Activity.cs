@@ -3,10 +3,6 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
-#if ALLOW_PARTIALLY_TRUSTED_CALLERS
-    using System.Security;
-#endif
-using System.Threading;
 
 namespace System.Diagnostics
 {
@@ -53,7 +49,16 @@ namespace System.Diagnostics
         ///  - '|a000b421-5d183ab6.1.8e2d4c28_' - Id of the grand child activity. It was started in another process and ends with '_'<para />
         /// 'a000b421-5d183ab6' is a <see cref="RootId"/> for the first Activity and all its children
         /// </example>
-        public string Id { get; private set; }
+        /// <remarks>
+        /// Use GetActivityExtension{LegacyActivityExtension}().Id instead.
+        /// </remarks>
+        public string Id
+        {
+            get
+            {
+                return GetActivityExtension<LegacyActivityExtension>()?.Id;
+            }
+        }
 
         /// <summary>
         /// The time that operation started.  It will typically be initialized when <see cref="Start"/>
@@ -77,7 +82,27 @@ namespace System.Diagnostics
         /// <para/>
         /// See <see href="https://github.com/dotnet/corefx/blob/master/src/System.Diagnostics.DiagnosticSource/src/ActivityUserGuide.md#id-format"/> for more details
         /// </summary>
-        public string ParentId { get; private set; }
+        /// <remarks>
+        /// Use GetActivityExtension{LegacyActivityExtension}().ParentId instead.
+        /// </remarks>
+        public string ParentId
+        {
+            get
+            {
+                return GetActivityExtension<LegacyActivityExtension>()?.ParentId;
+            }
+        }
+
+        /// <summary>
+        /// Indicates that an activity from another process logically started this activity. This
+        /// will get set to true if <see cref="SetParentId(string)"/> or <see cref="SetParentId{T}"/>
+        /// are called on this activity. A value of true means that <see cref="Parent"/> will be
+        /// set to null after the activity is started.
+        /// </summary>
+        public bool IsParentExternal
+        {
+            get; private set;
+        }
 
         /// <summary>
         /// Root Id is substring from Activity.Id (or ParentId) between '|' (or beginning) and first '.'.
@@ -85,25 +110,14 @@ namespace System.Diagnostics
         /// RootId may be null if Activity has neither ParentId nor Id.
         /// See <see href="https://github.com/dotnet/corefx/blob/master/src/System.Diagnostics.DiagnosticSource/src/ActivityUserGuide.md#id-format"/> for more details
         /// </summary>
+        /// <remarks>
+        /// Use GetActivityExtension{LegacyActivityExtension}().RootId instead.
+        /// </remarks>
         public string RootId
         {
             get
             {
-                //we expect RootId to be requested at any time after activity is created, 
-                //possibly even before it was started for sampling or logging purposes
-                //Presumably, it will be called by logging systems for every log record, so we cache it.
-                if (_rootId == null)
-                {
-                    if (Id != null)
-                    {
-                        _rootId = GetRootId(Id);
-                    }
-                    else if (ParentId != null)
-                    {
-                        _rootId = GetRootId(ParentId);
-                    }
-                }
-                return _rootId;
+                return GetActivityExtension<LegacyActivityExtension>()?.RootId;
             }
         }
 
@@ -152,6 +166,33 @@ namespace System.Diagnostics
             return null;
         }
 
+        /// <summary>
+        /// Gets the <see cref="ActivityExtension"/> instances attached to this Activity.
+        /// </summary>
+        public IEnumerable<ActivityExtension> ActivityExtensions
+        {
+            get
+            {
+                return _activityExtensions.Values;
+            }
+        }
+
+        /// <summary>
+        /// Gets the <see cref="ActivityExtension"/> instance of the given type, or
+        /// null if it doesn't exist.
+        /// </summary>
+        /// <typeparam name="T"><see cref="ActivityExtension"/> type.</typeparam>
+        /// <returns>The <see cref="ActivityExtension"/> instance or null.</returns>
+        public T GetActivityExtension<T>() where T : ActivityExtension
+        {
+            if (_activityExtensions.ContainsKey(typeof(T)))
+            {
+                return _activityExtensions[typeof(T)] as T;
+            }
+
+            return null;
+        }
+
         /* Constructors  Builder methods */
 
         /// <summary>
@@ -164,10 +205,18 @@ namespace System.Diagnostics
             if (string.IsNullOrEmpty(operationName))
             {
                 NotifyError(new ArgumentException($"{nameof(operationName)} must not be null or empty"));
-                return;
             }
-
-            OperationName = operationName;
+            else
+            {
+                OperationName = operationName;
+            }
+            
+            foreach (Type activityExtensionType in s_ActivityExtensionTypes)
+            {
+                _activityExtensions.Add(
+                    activityExtensionType,
+                    Activator.CreateInstance(activityExtensionType, this) as ActivityExtension);
+            }
         }
 
         /// <summary>
@@ -206,25 +255,36 @@ namespace System.Diagnostics
         /// Returns 'this' for convenient chaining.
         /// </summary>
         /// <param name="parentId">The id of the parent operation.</param>
+        /// <remarks>
+        /// Use SetParentId{LegacyActivityExtension}().SetParentId(); instead.
+        /// </remarks>
         public Activity SetParentId(string parentId)
         {
-            if (Parent != null)
+            if (isStarted)
             {
-                NotifyError(new InvalidOperationException($"Trying to set {nameof(ParentId)} on activity which has {nameof(Parent)}"));
+                NotifyError(new InvalidOperationException($"Trying to set {nameof(ParentId)} on activity which is already started"));
+                return this;
             }
-            else if (ParentId != null)
-            {
-                NotifyError(new InvalidOperationException($"{nameof(ParentId)} is already set"));
-            }
-            else if (string.IsNullOrEmpty(parentId))
-            {
-                NotifyError(new ArgumentException($"{nameof(parentId)} must not be null or empty"));
-            }
-            else
-            {
-                ParentId = parentId;
-            }
+
+            IsParentExternal = true;
+            GetActivityExtension<LegacyActivityExtension>()?.SetParentId(parentId);
+
             return this;
+        }
+
+        /// <summary>
+        /// Gets an <see cref="ActivityExtension"/> instance for the purpose of setting an external
+        /// Parent Id. This is intended to be used only at 'boundary' scenarios where an activity from
+        /// another process logically started this activity. This has the side-effect of setting
+        /// <see cref="IsParentExternal"/> to true, which will also mean that this Activity will not
+        /// have <see cref="Parent"/> set.
+        /// </summary>
+        /// <returns></returns>
+        public T SetParentId<T>() where T : ActivityExtension
+        {
+            IsParentExternal = true;
+
+            return GetActivityExtension<T>();
         }
 
         /// <summary>
@@ -288,20 +348,15 @@ namespace System.Diagnostics
         /// <seealso cref="SetStartTime(DateTime)"/>
         public Activity Start()
         {
-            if (Id != null)
+            if (isStarted)
             {
                 NotifyError(new InvalidOperationException("Trying to start an Activity that was already started"));
             }
             else
             {
-                if (ParentId == null)
+                if (!IsParentExternal)
                 {
-                    var parent = Current;
-                    if (parent != null)
-                    {
-                        ParentId = parent.Id;
-                        Parent = parent;
-                    }
+                    Parent = Current;
                 }
 
                 if (StartTimeUtc == default(DateTime))
@@ -309,9 +364,15 @@ namespace System.Diagnostics
                     StartTimeUtc = GetUtcNow();
                 }
 
-                Id = GenerateId();
+                ForEachActivityExtension((activityExtension) =>
+                {
+                    activityExtension.ActivityStarted();
+                });
+
                 SetCurrent(this);
+                isStarted = true;
             }
+
             return this;
         }
 
@@ -324,7 +385,7 @@ namespace System.Diagnostics
         /// <seealso cref="SetEndTime(DateTime)"/>
         public void Stop()
         {
-            if (Id == null)
+            if (!isStarted)
             {
                 NotifyError(new InvalidOperationException("Trying to stop an Activity that was not started"));
                 return;
@@ -339,7 +400,30 @@ namespace System.Diagnostics
                     SetEndTime(GetUtcNow());
                 }
 
+                ForEachActivityExtension((activityExtension) =>
+                {
+                    activityExtension.ActivityStopped();
+                });
+
                 SetCurrent(Parent);
+            }
+        }
+
+        /// <summary>
+        /// Registers an Activity Extension type. After registering an Activity
+        /// Extension type, each new Activity instance that is instantiated will
+        /// have an attached instance of the registered Activity Extension type.
+        /// Multiple Activity Extension types can be registered.
+        /// </summary>
+        /// <typeparam name="T">An <see cref="ActivityExtension"/> type to register.</typeparam>
+        public static void RegisterActivityExtension<T>() where T : ActivityExtension
+        {
+            lock (s_ActivityExtensionTypes)
+            {
+                if (!s_ActivityExtensionTypes.Contains(typeof(T)))
+                {
+                    s_ActivityExtensionTypes.Add(typeof(T));
+                }
             }
         }
 
@@ -357,100 +441,9 @@ namespace System.Diagnostics
             catch { }
         }
 
-        private string GenerateId()
-        {
-            string ret;
-            if (Parent != null)
-            {
-                // Normal start within the process
-                Debug.Assert(!string.IsNullOrEmpty(Parent.Id));
-                ret = AppendSuffix(Parent.Id, Interlocked.Increment(ref Parent._currentChildId).ToString(), '.');
-            }
-            else if (ParentId != null)
-            {
-                // Start from outside the process (e.g. incoming HTTP)
-                Debug.Assert(ParentId.Length != 0);
-
-                //sanitize external RequestId as it may not be hierarchical. 
-                //we cannot update ParentId, we must let it be logged exactly as it was passed.
-                string parentId = ParentId[0] == '|' ? ParentId : '|' + ParentId;
-
-                char lastChar = parentId[parentId.Length - 1];
-                if (lastChar != '.' && lastChar != '_')
-                {
-                    parentId += '.';
-                }
-
-                ret = AppendSuffix(parentId, Interlocked.Increment(ref s_currentRootId).ToString("x"), '_');
-            }
-            else
-            {
-                // A Root Activity (no parent).  
-                ret = GenerateRootId();
-            }
-            // Useful place to place a conditional breakpoint.  
-            return ret;
-        }
-
-        private string GetRootId(string id)
-        {
-            //id MAY start with '|' and contain '.'. We return substring between them
-            //ParentId MAY NOT have hierarchical structure and we don't know if initially rootId was started with '|',
-            //so we must NOT include first '|' to allow mixed hierarchical and non-hierarchical request id scenarios
-            int rootEnd = id.IndexOf('.');
-            if (rootEnd < 0)
-                rootEnd = id.Length;
-            int rootStart = id[0] == '|' ? 1 : 0;
-            return id.Substring(rootStart, rootEnd - rootStart);
-        }
-
-        private string AppendSuffix(string parentId, string suffix, char delimiter)
-        {
-#if DEBUG
-            suffix = OperationName.Replace('.', '-') + "-" + suffix;
-#endif
-            if (parentId.Length + suffix.Length < RequestIdMaxLength)
-                return parentId + suffix + delimiter;
-
-            //Id overflow:
-            //find position in RequestId to trim
-            int trimPosition = RequestIdMaxLength - 9; // overflow suffix + delimiter length is 9
-            while (trimPosition > 1)
-            {
-                if (parentId[trimPosition - 1] == '.' || parentId[trimPosition - 1] == '_')
-                    break;
-                trimPosition--;
-            }
-
-            //ParentId is not valid Request-Id, let's generate proper one.
-            if (trimPosition == 1)
-                return GenerateRootId();
-
-            //generate overflow suffix
-            string overflowSuffix = ((int)GetRandomNumber()).ToString("x8");
-            return parentId.Substring(0, trimPosition) + overflowSuffix + '#';
-        }
-
-        private string GenerateRootId()
-        {
-            // It is important that the part that changes frequently be first, because
-            // many hash functions don't 'randomize' the tail of a string.   This makes
-            // sampling based on the hash produce poor samples.
-            return  '|' + Interlocked.Increment(ref s_currentRootId).ToString("x") + s_uniqSuffix;
-        }
-#if ALLOW_PARTIALLY_TRUSTED_CALLERS
-        [SecuritySafeCritical]
-#endif
-        private static unsafe long GetRandomNumber()
-        {
-            // Use the first 8 bytes of the GUID as a random number.  
-            Guid g = Guid.NewGuid();
-            return *((long*)&g);
-        }
-
         private static bool ValidateSetCurrent(Activity activity)
         {
-            bool canSet = activity == null || (activity.Id != null && !activity.isFinished);
+            bool canSet = activity == null || (activity.isStarted && !activity.isFinished);
             if (!canSet)
             {
                 NotifyError(new InvalidOperationException("Trying to set an Activity that is not running"));
@@ -459,17 +452,22 @@ namespace System.Diagnostics
             return canSet;
         }
 
-        private string _rootId;
-        private int _currentChildId;  // A unique number for all children of this activity.  
+        private void ForEachActivityExtension(Action<ActivityExtension> action)
+        {
+            foreach (var activity in _activityExtensions.Values)
+            {
+                var activityExtension = activity as ActivityExtension;
 
-        // Used to generate an ID it represents the machine and process we are in.  
-        private static readonly string s_uniqSuffix = "-" + GetRandomNumber().ToString("x") + ".";
-
-        //A unique number inside the appdomain, randomized between appdomains. 
-        //Int gives enough randomization and keeps hex-encoded s_currentRootId 8 chars long for most applications
-        private static long s_currentRootId = (uint)GetRandomNumber();
-
-        private const int RequestIdMaxLength = 1024;
+                if (activityExtension != null)
+                {
+                    action(activityExtension);
+                }
+            }
+        }
+        
+        private static List<Type> s_ActivityExtensionTypes = new List<Type>() { typeof(LegacyActivityExtension) };
+        private Dictionary<Type, ActivityExtension> _activityExtensions =
+            new Dictionary<Type, ActivityExtension>();
 
         /// <summary>
         /// Having our own key-value linked list allows us to be more efficient  
@@ -482,6 +480,7 @@ namespace System.Diagnostics
 
         private KeyValueListNode _tags;
         private KeyValueListNode _baggage;
+        private bool isStarted;
         private bool isFinished;
         #endregion // private
     }
