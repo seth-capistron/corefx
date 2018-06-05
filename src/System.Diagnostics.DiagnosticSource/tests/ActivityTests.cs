@@ -42,7 +42,7 @@ namespace System.Diagnostics.Tests
 
             var parent = new Activity("parent");
 
-            Assert.Equal(2, parent.ActivityExtensions.Count());
+            Assert.Equal(3, parent.ActivityExtensions.Count());
             Assert.NotNull(parent.GetActivityExtension<EmptyActivityExtension>());
 
             TestActivityExtension parentActivityExtension = 
@@ -61,7 +61,7 @@ namespace System.Diagnostics.Tests
 
             var child = new Activity("child").Start();
 
-            Assert.Equal(2, child.ActivityExtensions.Count());
+            Assert.Equal(3, child.ActivityExtensions.Count());
             Assert.NotNull(child.GetActivityExtension<EmptyActivityExtension>());
 
             TestActivityExtension childExtensibleActivity = child.GetActivityExtension<TestActivityExtension>();

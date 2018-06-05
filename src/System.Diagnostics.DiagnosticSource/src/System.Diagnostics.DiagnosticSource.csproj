@@ -44,6 +44,7 @@
     <Compile Include="System\Diagnostics\Activity.cs" />
     <Compile Include="System\Diagnostics\ActivityExtension.cs" />
     <Compile Include="System\Diagnostics\DiagnosticSourceActivity.cs" />
+    <Compile Include="System\Diagnostics\LegacyActivityExtension.cs" />
     <None Include="ActivityUserGuide.md" />
   </ItemGroup>
   <ItemGroup Condition=" '$(TargetGroup)' != 'net45' And '$(TargetGroup)' != 'netstandard1.1'">
